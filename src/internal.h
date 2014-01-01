@@ -34,10 +34,38 @@ extern "C" {
   TAILQ_HEAD(shttp_listenings, shttp_listening_s);
   typedef struct shttp_listenings shttp_listenings_t;
   
+  
+  typedef enum shttp_message_status_e {
+    shttp_message_begin   = 0,
+    shttp_message_url     = 1,
+    shttp_message_field   = 2,
+    shttp_message_value   = 3,
+    shttp_message_body    = 4,
+    shttp_message_end     = 5
+  }shttp_message_status_t;
+
+  typedef struct shttp_parser_s {
+	struct http_parser          inner;
+	shttp_message_status_t      status;
+	cstring_t                   stack[2];
+	
+    shttp_callbacks_t           *callbacks;
+	shttp_connection_t          *conn;
+  } shttp_parser_t;
+
+  typedef struct shttp_buffer_s {
+	  char*  base;
+	  size_t capacity;
+	  size_t start;
+	  size_t end;
+  } shttp_buffer_t;
+
   typedef struct shttp_connection_internal_s {
-	shttp_connection_t inner;
-	uv_tcp_t           uv_handle;
-	http_parser        parser;
+	shttp_connection_t      inner;
+	uv_tcp_t                uv_handle;
+	shttp_parser_t          parser;
+	shttp_buffer_t          incoming;
+	shttp_buffer_t          outgoing;
 
     TAILQ_ENTRY(shttp_connection_internal_s) next;
   } shttp_connection_internal_t;
@@ -68,13 +96,6 @@ extern "C" {
 #define WARN(...)  _shttp_log_printf(SHTTP_LOG_WARN, __VA_ARGS__)
 #define ERR(...) _shttp_log_printf(SHTTP_LOG_ERR, __VA_ARGS__)
 #define CRIT(...)  _shttp_log_printf(SHTTP_LOG_CRIT, __VA_ARGS__)
-
-  // Http Parser Functions
-  extern void _http_parser_init(struct http_parser_settings* parser);
-
-  // Http Request Functions
-  extern shttp_request_t *_http_request__init(shttp_connection_t *client);
-  extern void _http_request__finish(shttp_request_t *req);
 
   // Log Functions
   void _http_log_data(const char* data, size_t len, const char* fmt, ...);

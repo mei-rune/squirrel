@@ -74,7 +74,6 @@
         'include/hashtable.h',
         'include/sstring.h',
         'include/test.h',
-        'src/ht-internal.h',
         'src/internal.h',
         'src/shttp_connection.c',
         'src/shttp_request.c',
@@ -160,7 +159,6 @@
         'include/hashtable.h',
         'include/sstring.h',
         'include/test.h',
-        'src/ht-internal.h',
         'src/internal.h',
         'src/shttp_connection.c',
         'src/shttp_request.c',
@@ -194,6 +192,27 @@
         'test/array_test.cpp',
         'test/hashtable_test.cpp',
         'test/main.c',
+      ],
+    }, # hello_world sample
+
+    ########################################
+    # parser test
+    ########################################
+    {
+      'target_name': 'parser_test',
+      'product_name': 'parser_test',
+      'type': 'executable',
+
+      'dependencies': [
+        'deps/http-parser/http_parser.gyp:http_parser',
+      ],
+      
+      'include_dirs': [
+        './include',
+      ],
+
+      'sources': [
+        'test/parser.c',
       ],
     }, # hello_world sample
 

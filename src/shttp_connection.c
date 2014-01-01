@@ -9,6 +9,11 @@
 extern "C" {
 #endif
 
+	
+   static size_t _shttp_parser_execute (shttp_parser_t *parser,
+                            const char *data,
+                            size_t len);
+
   /*****************************************************************************
    * HTTP Server Callback Functions
    ****************************************************************************/
@@ -36,7 +41,7 @@ extern "C" {
 
 	rc = uv_accept(server_handle, (uv_stream_t*)handle);
 	if(rc) {
-        ERR("accept: %s\n", uv_strerror(rc));
+        ERR("accept: %s.", uv_strerror(rc));
 		goto end;
 	}
 	uv_close(handle, &_shttp_on_null_disconnect);
@@ -55,45 +60,83 @@ end:
   }
 
   static void _shttp_on_connection_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf) {
-    buf->base = (char*)sl_malloc(suggested_size);
-    buf->len = suggested_size;
+    shttp_connection_internal_t *conn = (shttp_connection_internal_t*)req->data;
+	if(conn->incoming.start == conn->incoming.end) {
+		conn->incoming.start =0;
+		conn->incoming.end = 0;
+	}
+	buf->base = conn->incoming.base + conn->incoming.end;
+	buf->len = conn->incoming.capacity - conn->incoming.end;
   }
 
   static void _shttp_on_connection_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf) {
-    size_t parsed;
-    // Get the client
-    shttp_connection_internal_t *client = (shttp_connection_internal_t*)tcp->data;
+    size_t                      parsed;
+    shttp_connection_internal_t *conn;
 
-    if (nread > 0) {
-      // Read Data for Client connection
-      parsed = http_parser_execute(&client->parser, &client->inner.http->parser_settings, buf->base, nread);
-      if (parsed < nread || http_should_keep_alive(&client->parser)) {
-		if(HPE_OK != HTTP_PARSER_ERRNO(&client->parser)) {
-          ERR("parse error:%s\n", http_errno_name(HTTP_PARSER_ERRNO(&client->parser)));
-		}
-        uv_close((uv_handle_t*) &client->uv_handle, &_shttp_on_disconnect);
-      }
-    } else {
+	conn = (shttp_connection_internal_t*)tcp->data;
+    if (nread <= 0){
       // No Data Read... Handle Error case
       if (0 != nread && UV_EOF != nread) {
         ERR("read: %s\n", uv_strerror(nread));
       }
-      uv_close((uv_handle_t*) &client->uv_handle, &_shttp_on_disconnect);
+      uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_on_disconnect);
+	  return;	
     }
 
-    // Free memory that was allocated by _http_uv__on_alloc__cb
-    sl_free(buf->base);
+	parsed = http_parser_execute(&conn->parser.inner, &conn->inner.http->parser_settings, buf->base, nread);
+	if (nread != parsed) {
+		if(HPE_OK != HTTP_PARSER_ERRNO(&conn->parser.inner)) {
+			ERR("parse error:%s", http_errno_name(HTTP_PARSER_ERRNO(&conn->parser.inner)));
+		} else {
+			ERR("parse error: parsed is 0.");
+		}
+		uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_on_disconnect);
+		return;
+	}
+	
+	switch(conn->parser.status) {
+	case shttp_message_begin:
+		conn->incoming.start = 0;
+		conn->incoming.end = 0;
+		return;
+	case shttp_message_url:
+	case shttp_message_field:
+		assert(conn->parser.stack[0].str >= (conn->incoming.base + conn->incoming.start));
+		assert((conn->parser.stack[0].str + conn->parser.stack[0].len) ==
+		(conn->incoming.base + conn->incoming.end + nread));
+		conn->incoming.start = conn->parser.stack[0].str - conn->incoming.base;
+		conn->incoming.end = conn->incoming.start + conn->parser.stack[0].len;
+		return;
+	case shttp_message_value:
+		assert(conn->parser.stack[0].str >= (conn->incoming.base + conn->incoming.start));
+		assert((conn->parser.stack[0].str + conn->parser.stack[0].len + conn->parser.stack[1].len) ==
+			(conn->incoming.base + conn->incoming.end + nread));
+		conn->incoming.start = conn->parser.stack[0].str - conn->incoming.base;
+		conn->incoming.end = conn->incoming.start + conn->parser.stack[0].len + conn->parser.stack[1].len;
+		return ;
+	case shttp_message_body:
+		conn->incoming.start = 0;
+		conn->incoming.end = 0;
+		return;
+	case shttp_message_end:
+		conn->incoming.start = 0;
+		conn->incoming.end = 0;
+		return;
+	default:
+		ERR("parse error: status is unknown(%d).", conn->parser.status);
+		uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_on_disconnect);
+		return;
+	}
   }
 
   static void _shttp_on_connect(uv_stream_t* server_handle, int status) {
-
-	int                 rc;
-    shttp_listening_t  *listening;
+	int                         rc;
+    shttp_listening_t           *listening;
     shttp_connection_internal_t *conn;
-    shttp_t            *http;
+    shttp_t                     *http;
 
 	if(-1 == status) {
-        ERR("accept: %s\n", uv_strerror(status));
+        ERR("accept: %s", uv_strerror(status));
 		return;
 	}
 
@@ -108,10 +151,18 @@ end:
     uv_tcp_init(http->uv_loop, &conn->uv_handle);
 	conn->uv_handle.data = conn;
 
-    http_parser_init(&conn->parser, HTTP_REQUEST);
-    conn->parser.data = conn;
-    conn->inner.http = http;
-	conn->inner.internal = conn;
+	http_parser_init(&conn->parser.inner, HTTP_REQUEST);
+	conn->parser.inner.data = &conn->parser;
+	
+	
+	assert(conn->parser.callbacks == &conn->inner.http->settings.callbacks);
+	assert(conn->parser.conn == conn->inner.internal);
+    assert(conn->inner.http == http);
+	assert(conn->inner.internal == conn);
+	conn->incoming.start =0;
+	conn->incoming.end = 0;
+	conn->outgoing.start =0;
+	conn->outgoing.end = 0;
 
     rc = uv_accept(server_handle, (uv_stream_t*)&conn->uv_handle);
 	if(rc) {
@@ -126,7 +177,7 @@ end:
 							 _shttp_on_connection_read);
 
 	if(rc) {
-        ERR("accept: %s\n", uv_strerror(rc));
+        ERR("accept: %s", uv_strerror(rc));
 		uv_close((uv_handle_t*)&conn->uv_handle, &_shttp_on_disconnect);
 		return ;
 	}

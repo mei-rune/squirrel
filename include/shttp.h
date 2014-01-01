@@ -226,6 +226,17 @@ struct shttp_settings_s {
 	 */
 	uint64_t max_body_size;
 
+#define SHTTP_RW_BUFFER_SIZE   2*1024
+	/**
+	 * the read buffer size per connection, default is SHTTP_RW_BUFFER_SIZE
+	 */
+	size_t read_buffer_size;
+
+	/**
+	 * the write buffer size per connection, default is SHTTP_RW_BUFFER_SIZE
+	 */
+	size_t write_buffer_size;
+
 	/**
 	 * Bitmask of all HTTP methods that we accept and pass to user
 	 * callbacks. 
