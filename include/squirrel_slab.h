@@ -9,13 +9,11 @@ extern "C" {
 
 #include <stdint.h>
 
-typedef struct shttp_slab_page_s  shttp_slab_page_t;
-
-struct shttp_slab_page_s {
+typedef struct shttp_slab_page_s {
   uintptr_t           slab;
   shttp_slab_page_t   *next;
   uintptr_t           prev;
-};
+} shttp_slab_page_t;
 
 typedef struct {
   size_t              min_size;
