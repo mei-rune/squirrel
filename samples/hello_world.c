@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
   shttp_settings_t settings;
   shttp_t          *srv;
   shttp_res        rc;
-  
+
   memset(&settings, 0, sizeof(shttp_settings_t));
   settings.user_ctx_size = sizeof(usr_context_t);
   shttp_set_log_callback(&on_log);

@@ -60,8 +60,7 @@ static int shttp_slab_exact_size;
 static int shttp_slab_exact_shift;
 
 
-void
-shttp_slab_init(shttp_slab_pool_t *pool) {
+void shttp_slab_init(shttp_slab_pool_t *pool) {
   u_char           *p;
   size_t            size;
   shttp_int_t         m;
@@ -150,7 +149,7 @@ shttp_slab_init(shttp_slab_pool_t *pool) {
    * start指向第一块page的首地址
    * 值得注意的是数据区首地址必须是pagesize对齐，后续很多操作都得益于内存对齐
    */
-  pool->start = (u_char *)
+  pool->start = (uint8_t *)
                 shttp_align_ptr((uintptr_t) p + pages * sizeof(shttp_slab_page_t),
                                 shttp_pagesize);
 
@@ -166,35 +165,7 @@ shttp_slab_init(shttp_slab_pool_t *pool) {
   }
 }
 
-
-void *
-shttp_slab_alloc(shttp_slab_pool_t *pool, size_t size) {
-  void  *p;
-
-  /*
-   * 提供了一个加锁接口，具体见shttp_lock.h
-   *
-   * 如果内存池是基于共享内存分配，并同时给多个进程共享
-   * 则需实现一个进程级的自旋锁(可参考nginx的ngx_shmtx.c)
-   *
-   * 如果是多线程共享，则可使用线程级的自旋锁
-   * 如 pthread_spin_lock
-   *
-   * 如果是私有内存，并且是单进程单线程模型
-   * 则把shttp_shmtx_lock/unlock 可定义为空
-   */
-  shttp_shmtx_lock(&pool->mutex);
-
-  p = shttp_slab_alloc_locked(pool, size);
-
-  shttp_shmtx_unlock(&pool->mutex);
-
-  return p;
-}
-
-
-void *
-shttp_slab_alloc_locked(shttp_slab_pool_t *pool, size_t size) {
+void* shttp_slab_alloc(shttp_slab_pool_t *pool, size_t size) {
   size_t            s;
   uintptr_t         p, n, m, mask, *bitmap;
   shttp_size_t        i, slot, shift, map;
@@ -205,7 +176,7 @@ shttp_slab_alloc_locked(shttp_slab_pool_t *pool, size_t size) {
    */
   if (size >= shttp_slab_max_size) {
 
-    debug("slab alloc: %zu", size);
+    TRACE("slab alloc: %zu", size);
 
     page = shttp_slab_alloc_pages(pool, (size >> shttp_pagesize_shift)
                                   + ((size % shttp_pagesize) ? 1 : 0));
@@ -546,33 +517,21 @@ shttp_slab_alloc_locked(shttp_slab_pool_t *pool, size_t size) {
 
 done:
 
-  debug("slab alloc: %p", (void *)p);
+  TRACE("slab alloc: %p", (void *)p);
 
   return (void *) p;
 }
 
-
-void
-shttp_slab_free(shttp_slab_pool_t *pool, void *p) {
-  shttp_shmtx_lock(&pool->mutex);
-
-  shttp_slab_free_locked(pool, p);
-
-  shttp_shmtx_unlock(&pool->mutex);
-}
-
-
-void
-shttp_slab_free_locked(shttp_slab_pool_t *pool, void *p) {
+void shttp_slab_free(shttp_slab_pool_t *pool, void *p) {
   size_t            size;
   uintptr_t         slab, m, *bitmap;
   shttp_size_t        n, type, slot, shift, map;
   shttp_slab_page_t  *slots, *page;
 
-  debug("slab free: %p", p);
+  TRACE("slab free: %p", p);
 
   if ((u_char *) p < pool->start || (u_char *) p > pool->end) {
-    error("shttp_slab_free(): outside of pool");
+    ERR("shttp_slab_free(): outside of pool");
     goto fail;
   }
 
@@ -794,22 +753,20 @@ done:
 
 wrong_chunk:
 
-  error("shttp_slab_free(): pointer to wrong chunk");
+  ERR("shttp_slab_free(): pointer to wrong chunk");
 
   goto fail;
 
 chunk_already_free:
 
-  error("shttp_slab_free(): chunk is already free");
+  ERR("shttp_slab_free(): chunk is already free");
 
 fail:
 
   return;
 }
 
-
-static shttp_slab_page_t *
-shttp_slab_alloc_pages(shttp_slab_pool_t *pool, shttp_size_t pages) {
+static shttp_slab_page_t * shttp_slab_alloc_pages(shttp_slab_pool_t *pool, shttp_size_t pages) {
   shttp_slab_page_t  *page, *p;
 
   for (page = pool->free.next; page != &pool->free; page = page->next) {
@@ -874,15 +831,12 @@ shttp_slab_alloc_pages(shttp_slab_pool_t *pool, shttp_size_t pages) {
     }
   }
 
-  error("shttp_slab_alloc() failed: no memory");
+  ERR("shttp_slab_alloc() failed: no memory");
 
   return NULL;
 }
 
-
-static void
-shttp_slab_free_pages(shttp_slab_pool_t *pool, shttp_slab_page_t *page,
-                      shttp_size_t pages) {
+static void shttp_slab_free_pages(shttp_slab_pool_t *pool, shttp_slab_page_t *page, shttp_size_t pages) {
   shttp_slab_page_t  *prev;
 
   page->slab = pages--;
@@ -908,20 +862,13 @@ shttp_slab_free_pages(shttp_slab_pool_t *pool, shttp_slab_page_t *page,
   pool->free.next = page;
 }
 
-void
-shttp_slab_dummy_init(shttp_slab_pool_t *pool) {
+void shttp_slab_dummy_init(shttp_slab_pool_t *pool) {
   shttp_size_t n;
 
   /*
    * 内存池基于共享内存实现的场景
    * 外部进程attch同一块内存不需要重新初始化shttp_slab_pool_t
   */
-
-  shttp_pagesize = getpagesize();
-  for (n = shttp_pagesize, shttp_pagesize_shift = 0;
-       n >>= 1; shttp_pagesize_shift++) {
-    /* void */
-  }
 
   if (shttp_slab_max_size == 0) {
     shttp_slab_max_size = shttp_pagesize / 2;
@@ -932,8 +879,7 @@ shttp_slab_dummy_init(shttp_slab_pool_t *pool) {
   }
 }
 
-void
-shttp_slab_stat(shttp_slab_pool_t *pool, shttp_slab_stat_t *stat) {
+void shttp_slab_stat(shttp_slab_pool_t *pool, shttp_slab_stat_t *stat) {
   uintptr_t       m, n, mask, slab;
   uintptr_t       *bitmap;
   shttp_size_t      i, j, map, type, obj_size;
@@ -1042,21 +988,20 @@ shttp_slab_stat(shttp_slab_pool_t *pool, shttp_slab_stat_t *stat) {
   stat->pool_size = pool->end - pool->start;
   stat->used_pct = stat->used_size * 100 / stat->pool_size;
 
-  info("pool_size : %zu bytes", stat->pool_size);
-  info("used_size : %zu bytes", stat->used_size);
-  info("used_pct  : %zu%%\n",   stat->used_pct);
+  CRIT("pool_size : %zu bytes", stat->pool_size);
+  CRIT("used_size : %zu bytes", stat->used_size);
+  CRIT("used_pct  : %zu%%\n",   stat->used_pct);
 
-  info("total page count : %zu",  stat->pages);
-  info("free page count  : %zu\n",  stat->free_page);
+  CRIT("total page count : %zu",  stat->pages);
+  CRIT("free page count  : %zu\n",  stat->free_page);
 
-  info("small slab use page : %zu,\tbytes : %zu", stat->p_small, stat->b_small);
-  info("exact slab use page : %zu,\tbytes : %zu", stat->p_exact, stat->b_exact);
-  info("big   slab use page : %zu,\tbytes : %zu", stat->p_big,   stat->b_big);
-  info("page slab use page  : %zu,\tbytes : %zu\n", stat->p_page,  stat->b_page);
+  CRIT("small slab use page : %zu,\tbytes : %zu", stat->p_small, stat->b_small);
+  CRIT("exact slab use page : %zu,\tbytes : %zu", stat->p_exact, stat->b_exact);
+  CRIT("big   slab use page : %zu,\tbytes : %zu", stat->p_big,   stat->b_big);
+  CRIT("page slab use page  : %zu,\tbytes : %zu\n", stat->p_page,  stat->b_page);
 
-  info("max free pages : %zu\n",    stat->max_free_pages);
+  CRIT("max free pages : %zu\n",    stat->max_free_pages);
 }
-
 
 #ifdef __cplusplus
 };

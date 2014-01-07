@@ -76,10 +76,10 @@ typedef int boolean;
 #ifndef SHTTP_CPU_CACHE_LINE
 #define SHTTP_CPU_CACHE_LINE  32
 #endif
-#define shttp_align(d, a)     (((d) + (a - 1)) & ~(a - 1))
+#define shttp_align(d, a)         (((d) + (a - 1)) & ~(a - 1))
 #define SHTTP_MEM_ALIGNMENT       sizeof(intptr_t)
-#define shttp_mem_align(b) shttp_align(b, SHTTP_MEM_ALIGNMENT)
-
+#define shttp_mem_align(b)        shttp_align(b, SHTTP_MEM_ALIGNMENT)
+#define shttp_align_ptr(p, a)     (char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
 
 /* On Windows, variables that may be in a DLL must be marked specially.  */
 #ifdef _MSC_VER
