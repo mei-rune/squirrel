@@ -8,11 +8,11 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h> 
+#include <string.h>
 #include <assert.h>
-#include <errno.h> 
+#include <errno.h>
 
-#include "util.h"
+#include "squirrel_util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,7 +23,7 @@ extern "C" {
     if (!(condition)) {                                                          \
       LOG_PRINTF_2("Check failed: " #condition " at %s(%d)\n"                    \
                                , __FILE__, __LINE__);                            \
-	    abort();                                                                   \
+      abort();                                                                   \
       exit(1);                                                                   \
     }                                                                            \
   } while (0)
@@ -34,7 +34,7 @@ extern "C" {
     if (!(condition)) {                                                           \
       LOG_PRINTF_2("Check failed: " #condition ": " message " at %s(%d)\n"        \
                                , __FILE__, __LINE__);                             \
-	    abort();                                                                    \
+      abort();                                                                    \
       exit(1);                                                                    \
     }                                                                             \
   } while (0)
@@ -45,7 +45,7 @@ extern "C" {
     if (!(condition)) {                                                           \
      LOG_PRINTF_3("Check failed: " #condition ": %s at %s(%d)\n"                  \
                          , strerror(errno), __FILE__, __LINE__);                  \
-	    abort();                                                                    \
+      abort();                                                                    \
       exit(1);                                                                    \
     }                                                                             \
   } while (0)
@@ -55,7 +55,7 @@ extern "C" {
     if (!((val1) op (val2))) {                                                    \
       LOG_PRINTF_2("Check failed: " #val1 #op #val2 " at %s, %d\n"                \
                         , __FILE__, __LINE__ );                                   \
-	    abort();                                                                    \
+      abort();                                                                    \
       exit(1);                                                                    \
     }                                                                             \
   } while (0)
@@ -122,7 +122,7 @@ extern "C" {
     if(0 != out_fn)                                                   \
     {                                                                 \
       char buf[600];                                                  \
-      size_t len = snprintf(buf, sizeof(buf), fmt, arg1, arg2);	      \
+      size_t len = snprintf(buf, sizeof(buf), fmt, arg1, arg2);       \
       (*out_fn)(buf, len);                                            \
     }                                                                 \
     else                                                              \
@@ -170,7 +170,7 @@ typedef void (__cdecl *out_fn_t)(const char* buf, size_t len);
 #define TEST(a, b)                                                    \
 void __cdecl test_##a##_##b##_run(out_fn_t out_fn);                   \
 int test_##a##_##b##_var = ADD_RUN_TEST(UNITTEST_TO_STR(a##_##b)      \
-                 , &test_##a##_##b##_run);	                          \
+                 , &test_##a##_##b##_run);                            \
 void __cdecl test_##a##_##b##_run(out_fn_t out_fn)
 
 

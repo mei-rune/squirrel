@@ -1,5 +1,7 @@
 #include "squirrel_config.h"
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/timeb.h>
 #include "internal.h"
 
 #ifdef __cplusplus
@@ -12,10 +14,10 @@ int shttp_ncpu = 0;
 int shttp_cacheline_size = SHTTP_CPU_CACHE_LINE;
 int shttp_pagesize_shift = 0;
 
-void
-os_init() {
-  DWORD        bytes;
-  //ev_err_t     err;
+int cache_line_size();
+
+void os_init() {
+  //DWORD        bytes;
   uint32_t    n;
   SYSTEM_INFO  si;
   u_int               osviex;
@@ -66,14 +68,43 @@ os_init() {
   GetSystemInfo(&si);
   shttp_pagesize = si.dwPageSize;
   shttp_ncpu = si.dwNumberOfProcessors;
-  shttp_cacheline_size = SHTTP_CPU_CACHE_LINE;
+  shttp_cacheline_size = cache_line_size();
+  if(32 > shttp_cacheline_size) {
+    shttp_cacheline_size = SHTTP_CPU_CACHE_LINE;
+  }
 
-  // compute shttp_pagesize_shift
+  /*
+   * pagesize = pow(2, pagesize_shift)，即xxx_shift都是指幂指数
+   * 一块page被切割成大小相等的内存块(下面的注释暂称为obj)，
+   * 不同的page，被切割的obj大小可能不等，但obj的大小都是2的N次方分配的.即 8 16 32 ...
+   * */
   for (n = shttp_pagesize; n >>= 1; shttp_pagesize_shift++) {
     /* void */
   }
 }
 
+#ifdef _WIN32
+/* No gettimeofday; this muse be windows. */
+int shttp_gettimeofday(struct timeval *tv, struct timezone *tz) {
+  struct _timeb tb;
+
+  if (tv == NULL)
+    return -1;
+
+  /* XXXX
+   * _ftime is not the greatest interface here; GetSystemTimeAsFileTime
+   * would give us better resolution, whereas something cobbled together
+   * with GetTickCount could maybe give us monotonic behavior.
+   *
+   * Either way, I think this value might be skewed to ignore the
+   * timezone, and just return local time.  That's not so good.
+   */
+  _ftime(&tb);
+  tv->tv_sec = (long) tb.time;
+  tv->tv_usec = ((int) tb.millitm) * 1000;
+  return 0;
+}
+#endif
 
 #ifdef __cplusplus
 };

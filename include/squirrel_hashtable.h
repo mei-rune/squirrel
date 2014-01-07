@@ -3,10 +3,6 @@
 
 #include <stdlib.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define HASHTABLE_MAX_USAGE 0.60
 
 #define HASH_DECLARE_THUNK(name, key_type, value_type)                                              \
@@ -21,7 +17,7 @@ typedef struct name##_thunk_s {                                                 
   struct name##_thunk_s* next;                                                                      \
 } name##_thunk_t;
 
-  
+
 #define HASH_DECLARE_TABLE(name, thunk_type, key_type, value_type)                                  \
 typedef struct name##_s {                                                                           \
   size_t size;                                                                                      \
@@ -30,7 +26,7 @@ typedef struct name##_s {                                                       
 } name##_t;
 
 
-  
+
 #define HASH_DECLARE_ITERATOR(name, thunk_type, key_type, value_type)                               \
 typedef struct name##_iterator_s {                                                                  \
   name##_t* table;                                                                                  \
@@ -38,8 +34,8 @@ typedef struct name##_iterator_s {                                              
   thunk_type* next;                                                                                 \
 } name##_iterator_t;
 
-  
-  
+
+
 #define HASH_DECLARE_FUNC(FUNC_DECL, name, key_type, value_type)                                    \
 FUNC_DECL    void name##_init(name##_t* instance, size_t default_size);                             \
 FUNC_DECL    void name##_destroy(name##_t* instance);                                               \
@@ -50,7 +46,7 @@ FUNC_DECL    void name##_put(name##_t* instance, key_type key, value_type val); 
 FUNC_DECL    boolean name##_del(name##_t* instance, key_type key);                                  \
 FUNC_DECL    size_t name##_count(name##_t* instance);
 
-  
+
 #define HASH_DECLARE_FUNC_ITERATOR(FUNC_DECL, name, key_type, value_type)                           \
 FUNC_DECL    void name##_iterator_init(name##_iterator_t* it, name##_t* instance);                  \
 FUNC_DECL    void name##_iterator_destroy(name##_iterator_t* it);                                   \
@@ -323,9 +319,5 @@ FUNC_DECL    name##_entry_t* name##_iterator_current(name##_iterator_t* it) {   
             , default_set_key, default_set_value, default_set_next, hash, cmp, del)                \
  HASH_DEFINE_ITERATOR(FUNC_DECL, name)
 
-
-#ifdef __cplusplus
-};
-#endif
 
 #endif

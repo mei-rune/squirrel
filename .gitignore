@@ -35,3 +35,8 @@ Default/
 Debug/
 builds/
 tools/gyp
+
+
+# format code artifacts
+format_code.bat
+*.orig

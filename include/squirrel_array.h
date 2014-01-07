@@ -1,9 +1,5 @@
 #ifndef _arraylist_h_
-#define _arraylist_h_
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define _arraylist_h_ 1
 
 
 #define ARRAY_DECLARE(type)                                                              \
@@ -25,7 +21,7 @@ extern "C" {
 
 
 #define ARRAY_CLEAR(type, arr)  (arr)->length = 0
-	
+
 
 
 #define ARRAY_GET(type, arr, idx, default_value)                                        \
@@ -64,13 +60,8 @@ if( (idx) < (arr)->length)                                                      
     move(type, &((arr)->array[idx]),                                                   \
     &((arr)->array[(idx)+1]), (arr)->length - (idx) - 1);                              \
     -- (arr)->length;                                                                  \
-} 
+}
 
 #define ARRAY_POP(type, arr) ARRAY_DEL(type, arr, 0, MOVE_MEM)
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

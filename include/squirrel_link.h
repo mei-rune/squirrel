@@ -72,7 +72,7 @@
 //template< typename PDLINK ,typename PVALUE >
 //inline void DLINK_InsertNext(PDLINK _head,PVALUE _dlink)
 //{
-//	(_dlink)->_next = (_head)->_next;
+//  (_dlink)->_next = (_head)->_next;
 //  (_dlink)->_prev = (_head);
 //  (_head)->_next->_prev = (_dlink);
 //  (_head)->_next = (_dlink);
@@ -99,7 +99,7 @@
 //template< typename PDLINK >
 //inline void DLINK_Remove(PDLINK _dlink)
 //{
-//	(_dlink)->_prev->_next = (_dlink)->_next;
+//  (_dlink)->_prev->_next = (_dlink)->_next;
 //    (_dlink)->_next->_prev = (_dlink)->_prev;
 //}
 #define DLINK_Remove(_dlink)               (_dlink)->_prev->_next = (_dlink)->_next;\
@@ -108,9 +108,9 @@
 //template< typename PDLINK ,typename PVALUE >
 //inline PVALUE DLINK_ExtructPrev(PDLINK _head )
 //{
-//	PVALUE v = (_head)->_prev;
+//  PVALUE v = (_head)->_prev;
 //     DLINK_Remove((_head)->_prev);
-//	 return v;
+//   return v;
 //}
 #define DLINK_ExtructPrev(_head)           (_head)->_prev;\
                                           DLINK_Remove((_head)->_prev)
@@ -118,9 +118,9 @@
 //template< typename PDLINK ,typename PVALUE >
 //inline PVALUE DLINK_ExtructNext(PDLINK _head)
 //{
-//	PVALUE v = (_head)->_next;
+//  PVALUE v = (_head)->_next;
 //    DLINK_Remove((_head)->_next);
-//	return v;
+//  return v;
 //}
 #define DLINK_ExtructNext(_head)           (_head)->_next;\
                                            DLINK_Remove((_head)->_next)

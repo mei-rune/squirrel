@@ -11,8 +11,8 @@ extern "C" {
 
 //static int _http_request_on_message_begin(http_parser* parser) {
 //    shttp_connection_internal_t* conn = (shttp_connection_internal_t*)parser->data;
-//	conn->data.len =0;
-//	conn->message_status = shttp_message_begin;
+//  conn->data.len =0;
+//  conn->message_status = shttp_message_begin;
 //    return 0;
 //}
 //
@@ -23,79 +23,79 @@ extern "C" {
 //
 //static int _http_request_on_url(http_parser *parser, const char *at, size_t length) {
 //    shttp_connection_internal_t* conn = (shttp_connection_internal_t*)parser->data;
-//	if(conn->data.capacity - conn->data.len < length) {
+//  if(conn->data.capacity - conn->data.len < length) {
 //        ERR("parse_url: url is too large.\n");
-//		return -1;
-//	}
-//	memcpy(conn->data.str + conn->data.len, at, length);
-//	conn->data.len += length;
+//    return -1;
+//  }
+//  memcpy(conn->data.str + conn->data.len, at, length);
+//  conn->data.len += length;
 //    return 0;
 //}
 //
 //static int _http_request_on_url_complete(http_parser *parser) {
 //    shttp_connection_internal_t* conn;
-//	struct http_parser_url       parse_url;
-//	shttp_uri_t                  uri;
-//	int                          rc;
+//  struct http_parser_url       parse_url;
+//  shttp_uri_t                  uri;
+//  int                          rc;
 //
-//	conn = (shttp_connection_internal_t*)parser->data;
-//	rc = http_parser_parse_url(conn->data.str, conn->data.len, ( HTTP_CONNECT == parser->method)? 1:0, &parse_url);
-//	if(0 != rc) {
+//  conn = (shttp_connection_internal_t*)parser->data;
+//  rc = http_parser_parse_url(conn->data.str, conn->data.len, ( HTTP_CONNECT == parser->method)? 1:0, &parse_url);
+//  if(0 != rc) {
 //        ERR("parse_url: style error\n");
-//		return -1;
-//	}
-//	
-//	sstring_init(&uri.full, conn->data.str, conn->data.len);
-//	sstring_init(&uri.schema,
-//		conn->data.str + parse_url.field_data[UF_SCHEMA].off,
-//		parse_url.field_data[UF_SCHEMA].len);
-//	
-//	sstring_init(&uri.host,
-//		conn->data.str + parse_url.field_data[UF_HOST].off,
-//		parse_url.field_data[UF_HOST].len);
+//    return -1;
+//  }
 //
-//	sstring_init(&uri.port_s,
-//		conn->data.str + parse_url.field_data[UF_PORT].off,
-//		parse_url.field_data[UF_PORT].len);
+//  sstring_init(&uri.full, conn->data.str, conn->data.len);
+//  sstring_init(&uri.schema,
+//    conn->data.str + parse_url.field_data[UF_SCHEMA].off,
+//    parse_url.field_data[UF_SCHEMA].len);
 //
-//	uri.port_i = parse_url.port;
+//  sstring_init(&uri.host,
+//    conn->data.str + parse_url.field_data[UF_HOST].off,
+//    parse_url.field_data[UF_HOST].len);
 //
-//	sstring_init(&uri.path,
-//		conn->data.str + parse_url.field_data[UF_PATH].off,
-//		parse_url.field_data[UF_PATH].len);
+//  sstring_init(&uri.port_s,
+//    conn->data.str + parse_url.field_data[UF_PORT].off,
+//    parse_url.field_data[UF_PORT].len);
 //
-//	sstring_init(&uri.query,
-//		conn->data.str + parse_url.field_data[UF_QUERY].off,
-//		parse_url.field_data[UF_QUERY].len);
-//	
-//	sstring_init(&uri.fragment,
-//		conn->data.str + parse_url.field_data[UF_FRAGMENT].off,
-//		parse_url.field_data[UF_FRAGMENT].len);
+//  uri.port_i = parse_url.port;
 //
-//	sstring_init(&uri.user_info,
-//		conn->data.str + parse_url.field_data[UF_USERINFO].off,
-//		parse_url.field_data[UF_USERINFO].len);
+//  sstring_init(&uri.path,
+//    conn->data.str + parse_url.field_data[UF_PATH].off,
+//    parse_url.field_data[UF_PATH].len);
 //
-//	return conn->inner.http->settings.callbacks.on_message_begin(&conn->inner, 
-//		parser->http_major,
-//		parser->http_minor,
-//		parser->method,
-//		&uri);
+//  sstring_init(&uri.query,
+//    conn->data.str + parse_url.field_data[UF_QUERY].off,
+//    parse_url.field_data[UF_QUERY].len);
+//
+//  sstring_init(&uri.fragment,
+//    conn->data.str + parse_url.field_data[UF_FRAGMENT].off,
+//    parse_url.field_data[UF_FRAGMENT].len);
+//
+//  sstring_init(&uri.user_info,
+//    conn->data.str + parse_url.field_data[UF_USERINFO].off,
+//    parse_url.field_data[UF_USERINFO].len);
+//
+//  return conn->inner.http->settings.callbacks.on_message_begin(&conn->inner,
+//    parser->http_major,
+//    parser->http_minor,
+//    parser->method,
+//    &uri);
 //}
 //
 //static int _http_request_on_header_field(http_parser *parser, const char *at, size_t length) {
-//	int                          rc;
+//  int                          rc;
 //    shttp_connection_internal_t* conn;
-//	conn = (shttp_connection_internal_t*)parser->data;
-//	if(shttp_message_begin == conn->message_status) {
-//		conn->message_status = shttp_message_url;
-//		rc = _http_request_on_url_complete(parser);
-//		if(0 != rc) {
-//			return rc;
-//		}
-//	} else if(shttp_message_begin == conn->message_status) {
+//  conn = (shttp_connection_internal_t*)parser->data;
+//  if(shttp_message_begin == conn->message_status) {
+//    conn->message_status = shttp_message_url;
+//    rc = _http_request_on_url_complete(parser);
+//    if(0 != rc) {
+//      return rc;
+//    }
+//  } else if(shttp_message_begin == conn->message_status) {
 //
-//	}
+//  }
 //
 //    int i = 0;
 //
@@ -156,7 +156,7 @@ extern "C" {
 //    }
 //    connection->current_header_key_length = 0;
 //    connection->current_header_value_length = 0;
-//    
+//
 //    connection->request->http_major = parser->http_major;
 //    connection->request->http_minor = parser->http_minor;
 //    connection->request->method = parser->method;

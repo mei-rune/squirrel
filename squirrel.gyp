@@ -68,20 +68,25 @@
 
       'sources': [
         'include/squirrel_config.h',
-        'include/shttp.h',
-        'include/link.h',
-        'include/array.h',
-        'include/hashtable.h',
-        'include/sstring.h',
-        'include/test.h',
+        'include/squirrel_http.h',
+        'include/squirrel_link.h',
+        'include/squirrel_array.h',
+        'include/squirrel_hashtable.h',
+        'include/squirrel_string.h',
+        'include/squirrel_test.h',
+        'include/squirrel_slab.h',
+        'include/squirrel_util.h',
         'src/internal.h',
+        'src/shttp_slab.c',
         'src/shttp_connection.c',
+        'src/shttp_parser.c',
         'src/shttp_request.c',
         'src/shttp_response.c',
         'src/shttp_server.c',
         'src/sstring.c',
         'src/shttp_os_win.c',
         'src/shttp_log.c',
+        'src/shttp_cacheline.c',
         'src/test.c',
       ],
 
@@ -153,20 +158,25 @@
 
     'sources': [
         'include/squirrel_config.h',
-        'include/shttp.h',
-        'include/link.h',
-        'include/array.h',
-        'include/hashtable.h',
-        'include/sstring.h',
-        'include/test.h',
+        'include/squirrel_http.h',
+        'include/squirrel_link.h',
+        'include/squirrel_array.h',
+        'include/squirrel_hashtable.h',
+        'include/squirrel_string.h',
+        'include/squirrel_test.h',
+        'include/squirrel_slab.h',
+        'include/squirrel_util.h',
         'src/internal.h',
+        'src/shttp_slab.c',
         'src/shttp_connection.c',
+        'src/shttp_parser.c',
         'src/shttp_request.c',
         'src/shttp_response.c',
         'src/shttp_server.c',
         'src/sstring.c',
         'src/shttp_os_win.c',
         'src/shttp_log.c',
+        'src/shttp_cacheline.c',
         'src/test.c',
       ],
 
@@ -233,7 +243,7 @@
       ],
 
       'sources': [
-        'samples/hello_world/program.c',
+        'samples/hello_world.c',
       ],
 
       'copies': [
@@ -243,5 +253,61 @@
         ],
       }],
     }, # hello_world sample
+
+    ########################################
+    # pool_main sample
+    ########################################
+    {
+      'target_name': 'pool_main',
+      'product_name': 'pool_main',
+      'type': 'executable',
+
+      'dependencies': [
+        'squirrel',
+      ],
+      
+      'include_dirs': [
+        './include',
+      ],
+
+      'sources': [
+        'samples/pool_main.c',
+      ],
+
+      'copies': [
+      {
+        'destination': '<(PRODUCT_DIR)',
+        'files': [
+        ],
+      }],
+    }, # pool_main sample
+
+    ########################################
+    # pool_bench sample
+    ########################################
+    {
+      'target_name': 'pool_bench',
+      'product_name': 'pool_bench',
+      'type': 'executable',
+
+      'dependencies': [
+        'squirrel',
+      ],
+      
+      'include_dirs': [
+        './include',
+      ],
+
+      'sources': [
+        'samples/pool_bench.c',
+      ],
+
+      'copies': [
+      {
+        'destination': '<(PRODUCT_DIR)',
+        'files': [
+        ],
+      }],
+    }, # pool_bench sample
   ],
 }
