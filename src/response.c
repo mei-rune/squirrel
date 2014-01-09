@@ -146,6 +146,96 @@ cstring_t* _shttp_status_code_text(int status) {
   return &UNKNOWN_STATUS_CODE;
 }
 
+
+DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
+                                            uint16_t status,
+                                            cstring_t *content_type){
+  shttp_connection_internal_t          *inner;
+  char                                 *c;
+
+  inner = (shttp_connection_internal_t*)conn->internal;
+  if(1 == inner->inner.response.head_writed) {
+    return SHTTP_RES_HEAD_WRITED;
+  }
+
+  inner->inner.response.status_code = status;
+
+  c = (char*)shttp_slab_alloc(inner->pool, content_type->len);
+  if(nil == c) {
+    return SHTTP_RES_MEMORY;
+  }
+  memcpy(c, content_type->str, content_type->len);
+  
+  conn->response.content_type.str = c;
+  conn->response.content_type.len = content_type->len;
+  return SHTTP_RES_OK;
+}
+
+DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn){
+  shttp_connection_internal_t          *inner;
+  inner = (shttp_connection_internal_t*)conn->internal;
+  if(1 == inner->inner.response.head_writed) {
+    return SHTTP_RES_HEAD_WRITED;
+  }
+  conn->response.chunked = 1;
+  return SHTTP_RES_OK;
+}
+
+DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
+                                    const char *key,
+                                    size_t     key_len,
+                                    const char *value,
+                                    size_t     value_len,
+                                    int        flag) {
+  shttp_connection_internal_t          *inner;
+  inner = (shttp_connection_internal_t*)conn->internal;
+  
+  if(1 == inner->inner.response.head_writed) {
+    return SHTTP_RES_HEAD_WRITED;
+  }
+  //#define HTTP_RESPONSE_HEADERS_CHUNKED \
+//    "HTTP/1.1 %d %s\r\n" \
+//    "Connection: %s\r\n" \
+//    "Content-Type: %s\r\n" \
+//    "Transfer-Encoding: chunked\r\n" \
+//    "%s\r\n"
+
+  if(12 == key_len && 0 == strncmp("Content-Type", key, key_len)) {
+
+  } else if(17 == key_len && 0 == strncmp("Transfer-Encoding", key, key_len) &&
+    7 == value_len && 0 == strncmp("chunked", value, value_len)) {
+      conn->response.chunked = 1;
+  } else if(10 == key_len && 0 == strncmp("Connection", key, key_len) &&
+    5 == value_len && 0 == strncmp("close", value, value_len)) {
+      conn->response.close_connection = 1;
+  } else {
+    if(conn->request.headers.length >= inner->outgoing.headers.length) {
+      return SHTTP_RES_HEAD_TOO_LARGE;
+    }
+    conn->request.headers.array[conn->request.headers.length].key.str = key;
+    conn->request.headers.array[conn->request.headers.length].key.len = key_len;
+    conn->request.headers.array[conn->request.headers.length].val.str = value;
+    conn->request.headers.array[conn->request.headers.length].val.len = value_len;
+    conn->request.headers.length += 1;
+  }
+  
+  return SHTTP_RES_OK;
+}
+DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
+                               const char *data,
+                               int length,
+                               shttp_write_cb cb,
+                               void *cb_data) {
+  shttp_connection_internal_t          *inner;
+  inner = (shttp_connection_internal_t*)conn->internal;
+  return SHTTP_RES_NOTIMPLEMENT;
+}
+DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn) {
+  shttp_connection_internal_t          *inner;
+  inner = (shttp_connection_internal_t*)conn->internal;
+   return SHTTP_RES_NOTIMPLEMENT;
+}
+
 //  /*****************************************************************************
 //   * HTTP Server Response API
 //   ****************************************************************************/

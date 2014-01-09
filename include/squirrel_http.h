@@ -35,7 +35,6 @@ extern "C" {
 #endif
 /**@}*/
 
-
 /** @name Request Methods
  */
 /**@{*/
@@ -140,8 +139,14 @@ struct shttp_settings_s {
    * the user context size per connection, default is SHTTP_CTX_SIZE
    */
   size_t user_ctx_size;
+  
+#define SHTTP_MAX_HEADER_COUNT  256
+  /**
+   * max headers size, default is SHTTP_MAX_HEADER_COUNT
+   */
+  size_t max_headers_count;
 
-#define SHTTPE_MAX_HEADER_SIZ  256
+#define SHTTPE_MAX_HEADER_SIZE  4*1024
   /**
    * max headers size, default is SHTTP_HEADER_SIZE_MAX
    */
@@ -154,16 +159,11 @@ struct shttp_settings_s {
    */
   uint64_t max_body_size;
 
-#define SHTTP_RW_BUFFER_SIZE   2*1024
+#define SHTTP_RW_BUFFER_SIZE   2*1024*1024
   /**
    * the read buffer size per connection, default is SHTTP_RW_BUFFER_SIZE
    */
-  size_t read_buffer_size;
-
-  /**
-   * the write buffer size per connection, default is SHTTP_RW_BUFFER_SIZE
-   */
-  size_t write_buffer_size;
+  size_t rw_buffer_size;
 
   /**
    * Bitmask of all HTTP methods that we accept and pass to user
@@ -213,37 +213,41 @@ struct shttp_uri_s {
 struct shttp_kv_s {
   cstring_t key;
   cstring_t val;
-
-  TAILQ_ENTRY(shttp_kv_s) next;
 };
 
-TAILQ_HEAD(shttp_kvs_s, shttp_kv_s);
 
-
-typedef struct shttp_kv_array_s {
-  size_t      capacity;
+typedef struct shttp_header_s {
   size_t      length;
-  shttp_kv_t  array;
-} shttp_kv_array_t;
+  shttp_kv_t  *array;
+} shttp_header_t;
 
 /**
  * @brief a structure containing all information for a http request.
  */
 struct shttp_request_s {
-  uint16_t           version;
+  uint16_t           http_major;
+  uint16_t           http_minor;
   uint32_t           method;
+  uint64_t           content_length;
   shttp_uri_t        uri;
-  shttp_kv_array_t   headers;
+  shttp_header_t     headers;
 };
 
 /**
  * @brief a structure containing all information for a http request.
  */
 struct shttp_response_s {
-  uint16_t           status_code;
+  uint16_t           http_major;
+  uint16_t           http_minor;
+  uint64_t           status_code:16;
+  uint64_t           close_connection:1;
+  uint64_t           chunked:1;
+  uint64_t           head_writed:1;
+  uint64_t           reserved:13;
+
   cstring_t          content_type;
-  boolean            connection;
-  shttp_kv_array_t   headers;
+  uint64_t           content_length;
+  shttp_header_t     headers;
 };
 
 struct shttp_connection_s {
@@ -262,11 +266,14 @@ struct shttp_write_cb_s {
 };
 
 /* Response codes */
-typedef intptr_t                shttp_res;
-#define SHTTP_RES_OK        0 /**< request completed ok */
-#define SHTTP_RES_MEMORY    -1  /**< request does not have content */
-#define SHTTP_RES_UV        -2  /**< request does not have content */
-#define SHTTP_RES_NOTIMPLEMENT  -3  /**< the server is not available */
+typedef intptr_t                      shttp_res;
+#define SHTTP_RES_OK                  0
+#define SHTTP_RES_ERROR               -1
+#define SHTTP_RES_MEMORY              -2
+#define SHTTP_RES_UV                  -3
+#define SHTTP_RES_NOTIMPLEMENT        -4
+#define SHTTP_RES_HEAD_WRITED         -5
+#define SHTTP_RES_HEAD_TOO_LARGE      -6
 
 DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 
@@ -276,56 +283,42 @@ DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 * For TCP networks, addresses have the form host:port. If host is a literal
 * IPv6 address, it must be enclosed in square brackets.
 */
-DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, char *listen_addr, short port);
+DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char *listen_addr, short port);
 DLL_VARIABLE shttp_res shttp_run(shttp_t *server);
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
 
-// Shortcut functions to write a reponse
-//shttp_res http_send_response_string(shttp_connection_t *conn, int status,
-//        const char *extra_headers, const char *content_type,
-//        const char *content, const uint32_t content_length,
-//        shttp_write_cb cb, void *cb_data);
-//
-//shttp_res http_send_response_buffers(shttp_connection_t *conn, int status,
-//        const char *extra_headers, const char *content_type,
-//        cstring_t *content_buffers, int content_buffers_count,
-//        shttp_write_cb content_cb, void *content_cb_data);
 
-// Chuncked sending
-shttp_res shttp_response_start(shttp_connection_t *conn, uint16_t status, cstring_t *content_type);
-shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
-shttp_res shttp_response_set_header(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn, uint16_t status, cstring_t *content_type);
+DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
+
+#define SHTTP_HEAD_COPY             (0)
+#define SHTTP_MEM_COPY              0
+#define SHTTP_MEM_NOFREE            1
+#define SHTTP_MEM_RESFREE           2
+#define SHTTP_MEM_CFREE             3
+
+#define SHTTP_HEAD_KEY_COPY         (SHTTP_MEM_COPY<<8)
+#define SHTTP_HEAD_KEY_NOFREE       (SHTTP_MEM_NOFREE<<8)
+#define SHTTP_HEAD_KEY_RESFREE      (SHTTP_MEM_RESFREE<<8)
+#define SHTTP_HEAD_KEY_CFREE        (SHTTP_MEM_CFREE<<8)
+
+#define SHTTP_HEAD_VAL_COPY         SHTTP_MEM_COPY
+#define SHTTP_HEAD_VAL_NOFREE       SHTTP_MEM_NOFREE
+#define SHTTP_HEAD_VAL_RESFREE      SHTTP_MEM_RESFREE
+#define SHTTP_HEAD_VAL_CFREE        SHTTP_MEM_CFREE
+
+DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
                                     const char *key,
                                     size_t     key_len,
                                     const char *value,
                                     size_t     value_len,
-                                    int        free_flag);
-shttp_res shttp_response_write(shttp_connection_t *conn,
+                                    int        flag);
+DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
                                const char *data,
                                int length,
                                shttp_write_cb cb,
                                void *cb_data);
-shttp_res shttp_response_end(shttp_connection_t *conn);
-
-
-
-//DLL_VARIABLE http_server_t* http_init_from_config(char* configuration_filename);
-//DLL_VARIABLE http_server_t* http_init_with_config(configuration* config);
-//DLL_VARIABLE int http_http_open(http_server_t* srv);
-//DLL_VARIABLE void http_http_add_route(char* route, http_request_callback callback, void* user_data);
-//DLL_VARIABLE char* http_get_header(http_request* request, char* key);
-//
-//DLL_VARIABLE const char* http_status_code_text(int status);
-//
-//DLL_VARIABLE void http_free_response(shttp_response_t* response);
-//DLL_VARIABLE void http_response_set_version(shttp_response_t* response, unsigned short major, unsigned short minor);
-//DLL_VARIABLE void http_response_set_status_code(shttp_response_t* response, string_t* status_code);
-//DLL_VARIABLE void http_response_set_header(shttp_response_t* response, string_t* name, string_t* value);
-//DLL_VARIABLE void http_response_set_body(shttp_response_t* response, string_t* body);
-//DLL_VARIABLE void http_response_send(shttp_response_t* response, void* user_data, http_response_complete_callback callback);
-//
-
-
+DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
 
 /**
   A callback function used to intercept Libevent's log messages.

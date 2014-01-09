@@ -76,7 +76,7 @@ static int _http_request_on_status(http_parser *parser, const char *at, size_t l
   return 0;
 }
 
-int _http_request_init(struct http_parser_settings *parser_settings) {
+void _http_request_init(struct http_parser_settings *parser_settings) {
   parser_settings->on_message_begin = _http_request_on_message_begin;
   parser_settings->on_url = _http_request_on_url;
   parser_settings->on_status = _http_request_on_status;

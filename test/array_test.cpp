@@ -1,7 +1,7 @@
 
-#include "platform.h"
-#include "array.h"
-#include "test.h"
+#include "squirrel_config.h"
+#include "squirrel_array.h"
+#include "squirrel_test.h"
 
 
 typedef struct intArray_s

@@ -1,4 +1,4 @@
-#include "test.h"
+#include "squirrel_test.h"
 
 
 void out(const char* buf, size_t len) {

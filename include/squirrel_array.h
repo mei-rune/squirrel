@@ -24,6 +24,8 @@
 
 
 
+#define ARRAY_SET(type, arr, idx, value)  (arr)->array[idx] = (value); (arr)->length += 1
+
 #define ARRAY_GET(type, arr, idx, default_value)                                        \
  (((idx) >= (arr)->length)?(type)(default_value):(arr)->array[idx])
 

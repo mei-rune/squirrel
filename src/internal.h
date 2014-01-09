@@ -47,46 +47,53 @@ typedef struct shttp_listenings shttp_listenings_t;
 
 typedef enum shttp_message_status_e {
   shttp_message_begin   = 0,
-  shttp_message_url     = 1,
-  shttp_message_field   = 2,
-  shttp_message_value   = 3,
-  shttp_message_body    = 4,
-  shttp_message_end     = 5
+  shttp_message_status  = 1,
+  shttp_message_url     = 2,
+  shttp_message_field   = 3,
+  shttp_message_value   = 4,
+  shttp_message_body    = 5,
+  shttp_message_end     = 6
 } shttp_message_status_t;
 
 
+typedef struct shttp_kv_array_s {
+  size_t      capacity;
+  size_t      length;
+  shttp_kv_t  *array;
+} shttp_kv_array_t;
+
 typedef struct shttp_incomming_s {
-  char*                   base;
-  size_t                  capacity;
-  size_t                  start;
-  size_t                  end;
-
-  struct http_parser      parser;
-  shttp_message_status_t  status;
-  cstring_t               stack[2];
-
-  shttp_callbacks_t       *callbacks;
-  shttp_connection_t      *conn;
-
+  cstring_t                          url;
+  shttp_kv_array_t                   headers;
+  struct shttp_connection_internal_s *conn;
+  
+  shttp_message_status_t             status;
+  int                                head_reading;
+  struct http_parser                 parser;
+  size_t                             headers_bytes_count;
 } shttp_incomming_t;
 
-typedef struct shttp_outgoing_s {
-  char*  base;
-  size_t len;
-  size_t capacity;
+typedef struct shttp_send_buffer_s {
+  size_t      capacity;
+  size_t      length;
+  shttp_kv_t  array[256];
+} shttp_send_buffer_t;
 
-  int            status_code;
-  boolean        chunked;
-  unsigned short http_major;
-  unsigned short http_minor;
+typedef struct shttp_outgoing_s {
+  shttp_send_buffer_t buffer;
+  shttp_header_t      headers;
 } shttp_outgoing_t;
 
 typedef struct shttp_connection_internal_s {
-  shttp_connection_t      inner;
   uv_tcp_t                uv_handle;
-  shttp_slab_pool_t       arena;
+  shttp_connection_t      inner;
+  shttp_callbacks_t       *callbacks;
   shttp_incomming_t       incomming;
   shttp_outgoing_t        outgoing;
+  shttp_slab_pool_t*      pool;
+  void*                   arena_base;
+  size_t                  arena_capacity;
+  size_t                  arena_offset;
 
   TAILQ_ENTRY(shttp_connection_internal_s) next;
 } shttp_connection_internal_t;
@@ -108,7 +115,7 @@ struct shttp_s {
 #define UV_CHECK(r, loop, msg)                    \
     if (r) {                                      \
         ERR("%s: %s\n", msg, uv_strerror(r));     \
-    return SHTTP_RES_UV;                      \
+        return SHTTP_RES_UV;                      \
     }
 
 #define LOG_HTTP(at, len, fmt, ...) _shttp_log_data(at, len, fmt "\n", __VA_ARGS__);

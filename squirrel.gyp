@@ -45,6 +45,11 @@
           'include_dirs': [
             'include/win32',
           ],
+		  'direct_dependent_settings': {
+			'include_dirs': [
+              'include/win32',
+			]
+		  },
         }, { # OS != "win",
           'defines': [
             'PLATFORM_POSIX',
@@ -77,16 +82,15 @@
         'include/squirrel_slab.h',
         'include/squirrel_util.h',
         'src/internal.h',
-        'src/shttp_slab.c',
-        'src/shttp_connection.c',
-        'src/shttp_parser.c',
-        'src/shttp_request.c',
-        'src/shttp_response.c',
-        'src/shttp_server.c',
+        'src/slab.c',
+        'src/connection.c',
+        'src/request.c',
+        'src/response.c',
+        'src/server.c',
         'src/sstring.c',
-        'src/shttp_os_win.c',
-        'src/shttp_log.c',
-        'src/shttp_cacheline.c',
+        'src/os_win.c',
+        'src/log.c',
+        'src/cacheline.c',
         'src/test.c',
       ],
 
@@ -135,6 +139,11 @@
           'include_dirs': [
             'include/win32',
           ],
+		  'direct_dependent_settings': {
+			'include_dirs': [
+              'include/win32',
+			]
+		  },
         }, { # OS != "win",
           'defines': [
             'PLATFORM_POSIX',
@@ -167,16 +176,15 @@
         'include/squirrel_slab.h',
         'include/squirrel_util.h',
         'src/internal.h',
-        'src/shttp_slab.c',
-        'src/shttp_connection.c',
-        'src/shttp_parser.c',
-        'src/shttp_request.c',
-        'src/shttp_response.c',
-        'src/shttp_server.c',
+        'src/slab.c',
+        'src/connection.c',
+        'src/request.c',
+        'src/response.c',
+        'src/server.c',
         'src/sstring.c',
-        'src/shttp_os_win.c',
-        'src/shttp_log.c',
-        'src/shttp_cacheline.c',
+        'src/os_win.c',
+        'src/log.c',
+        'src/cacheline.c',
         'src/test.c',
       ],
 

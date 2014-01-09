@@ -7,11 +7,11 @@ int main(int argc, char **argv) {
   size_t  pool_size = 4096000;  //4M
   shttp_slab_stat_t stat;
   char  *space;
-  space = (char *)malloc(pool_size);
-
   shttp_slab_pool_t *sp;
-  sp = (shttp_slab_pool_t*) space;
 
+  space = (char *)malloc(pool_size);
+  sp = (shttp_slab_pool_t*) space;
+  
   sp->addr = space;
   sp->min_shift = 3;
   sp->end = space + pool_size;

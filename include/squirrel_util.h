@@ -11,18 +11,19 @@
 #endif
 
 #ifdef _WIN32
-#define snprintf _snprintf
-#define vsnprintf _vsnprintf
-#define vscprintf _vscprintf
+#define snprintf    _snprintf
+#define vsnprintf   _vsnprintf
+#define vscprintf   _vscprintf
+//#define strncmp     _strncmp
 #define strncasecmp _strnicmp
-#define strcasecmp _stricmp
-#define strtoll _strtoi64
-#define strtoull _strtoui64
-#define filelength _filelength
-#define fileno _fileno
-#define getcwd _getcwd
-#define stat _stat
-#define access _access
+#define strcasecmp  _stricmp
+#define strtoll     _strtoi64
+#define strtoull    _strtoui64
+#define filelength  _filelength
+#define fileno      _fileno
+#define getcwd      _getcwd
+#define stat        _stat
+#define access      _access
 
 #define socket_t SOCKET
 #define iovec WSABUF

@@ -1,5 +1,5 @@
-#include "hashtable.h"
-#include "test.h"
+#include "squirrel_hashtable.h"
+#include "squirrel_test.h"
 
 #define hash_int(x) x
 #define cmp_int(x,y) (x - y)

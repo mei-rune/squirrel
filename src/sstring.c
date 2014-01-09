@@ -209,7 +209,7 @@ DLL_VARIABLE void sbuffer_release(sbuffer_t* lhs, sstring_t* rhs) {
 
 DLL_VARIABLE sbuffer_t* sbuffer_append_from_file(sbuffer_t* pcs, const char* name) {
 
-  int num;
+  size_t num;
   size_t newLen;
   FILE* stream = fopen(name, "r");
   if(0 == stream)

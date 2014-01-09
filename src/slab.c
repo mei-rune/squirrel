@@ -60,7 +60,7 @@ static int shttp_slab_exact_size;
 static int shttp_slab_exact_shift;
 
 
-void shttp_slab_init(shttp_slab_pool_t *pool) {
+DLL_VARIABLE void shttp_slab_init(shttp_slab_pool_t *pool) {
   u_char           *p;
   size_t            size;
   shttp_int_t         m;
@@ -165,7 +165,7 @@ void shttp_slab_init(shttp_slab_pool_t *pool) {
   }
 }
 
-void* shttp_slab_alloc(shttp_slab_pool_t *pool, size_t size) {
+DLL_VARIABLE void* shttp_slab_alloc(shttp_slab_pool_t *pool, size_t size) {
   size_t            s;
   uintptr_t         p, n, m, mask, *bitmap;
   shttp_size_t        i, slot, shift, map;
@@ -522,7 +522,7 @@ done:
   return (void *) p;
 }
 
-void shttp_slab_free(shttp_slab_pool_t *pool, void *p) {
+DLL_VARIABLE void shttp_slab_free(shttp_slab_pool_t *pool, void *p) {
   size_t            size;
   uintptr_t         slab, m, *bitmap;
   shttp_size_t        n, type, slot, shift, map;
@@ -722,12 +722,12 @@ void shttp_slab_free(shttp_slab_pool_t *pool, void *p) {
     }
 
     if (slab == SHTTP_SLAB_PAGE_FREE) {
-      alert("shttp_slab_free(): page is already free");
+      ERR("shttp_slab_free(): page is already free");
       goto fail;
     }
 
     if (slab == SHTTP_SLAB_PAGE_BUSY) {
-      alert("shttp_slab_free(): pointer to wrong page");
+      ERR("shttp_slab_free(): pointer to wrong page");
       goto fail;
     }
 
@@ -862,7 +862,7 @@ static void shttp_slab_free_pages(shttp_slab_pool_t *pool, shttp_slab_page_t *pa
   pool->free.next = page;
 }
 
-void shttp_slab_dummy_init(shttp_slab_pool_t *pool) {
+DLL_VARIABLE void shttp_slab_dummy_init(shttp_slab_pool_t *pool) {
   shttp_size_t n;
 
   /*
@@ -879,7 +879,7 @@ void shttp_slab_dummy_init(shttp_slab_pool_t *pool) {
   }
 }
 
-void shttp_slab_stat(shttp_slab_pool_t *pool, shttp_slab_stat_t *stat) {
+DLL_VARIABLE void shttp_slab_stat(shttp_slab_pool_t *pool, shttp_slab_stat_t *stat) {
   uintptr_t       m, n, mask, slab;
   uintptr_t       *bitmap;
   shttp_size_t      i, j, map, type, obj_size;

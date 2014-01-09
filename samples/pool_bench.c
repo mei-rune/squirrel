@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/timeb.h>
 #ifdef _WIN32
@@ -49,6 +50,11 @@ int main(int argc, char **argv) {
   shttp_slab_pool_t *sp;
   size_t  pool_size;
   char  *space;
+  char *p;
+  uint64_t us_begin;
+  uint64_t us_end;
+  int i, j;
+  size_t size[] = { 30, 120, 256, 500, 1000, 2000, 3000, 5000};
 
   pool_size = 4096000;  //4M
   space = (char *)malloc(pool_size);
@@ -60,14 +66,9 @@ int main(int argc, char **argv) {
 
   shttp_slab_init(sp);
 
-  char *p;
-  uint64_t us_begin;
-  uint64_t us_end;
-  size_t size[] = { 30, 120, 256, 500, 1000, 2000, 3000, 5000};
 
   printf("size\tncx\tmalloc\n");
 
-  int i, j;
   for (j = 0; j < sizeof(size)/sizeof(size_t); j++) {
     size_t s = size[j];
     printf("%d\t", s);
