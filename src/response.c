@@ -155,9 +155,9 @@ cstring_t* _shttp_status_code_text(int status) {
     inner->outgoing.write_cb_list.array[inner->outgoing.write_cb_list.length].data = (func_data);    \
     inner->outgoing.write_cb_list.length ++
 
-#define conn_malloc(inner, size) shttp_slab_alloc((inner)->pool, (size))
-#define conn_realloc(inner, p, size) shttp_slab_realloc((inner)->pool, (p), (size))
-#define conn_free(inner, p) shttp_slab_free((inner)->pool, (p))
+#define conn_malloc(inner, size) spool_malloc(&(inner)->pool, (size))
+#define conn_realloc(inner, p, size) spool_realloc(&(inner)->pool, (p), (size))
+#define conn_free(inner, p) spool_free(&(inner)->pool, (p))
 
 char* conn_strdup(shttp_connection_internal_t *inner, const char *c, size_t size) {
   char * p;
@@ -202,7 +202,7 @@ DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn){
 void shttp_head_pool_free (shttp_connection_t *conn, void *data) {
   shttp_connection_internal_t          *inner;
   inner = (shttp_connection_internal_t*)conn->internal;
-  shttp_slab_free(inner->pool, data);
+  spool_free(&inner->pool, data);
 }
 
 void shttp_head_c_free (shttp_connection_t *conn, void *data) {

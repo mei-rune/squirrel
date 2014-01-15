@@ -23,7 +23,7 @@
 #include "http_parser.h"
 #include "squirrel_util.h"
 #include "squirrel_string.h"
-#include "squirrel_slab.h"
+#include "squirrel_pool.h"
 #include "squirrel_http.h"
 
 
@@ -102,7 +102,7 @@ typedef struct shttp_connection_internal_s {
   shttp_callbacks_t       *callbacks;
   shttp_incomming_t       incomming;
   shttp_outgoing_t        outgoing;
-  shttp_slab_pool_t*      pool;
+  spool_t                 pool;
   void*                   arena_base;
   size_t                  arena_capacity;
   size_t                  arena_offset;

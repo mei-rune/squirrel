@@ -56,15 +56,7 @@ int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at
 }
 
 int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
-  shttp_slab_pool_t* pool;
-
-  pool = (shttp_slab_pool_t*) ((char*)conn->arena_base) + conn->arena_offset;
-  pool->addr = pool;
-  pool->min_shift = 3;
-  pool->end = (uint8_t*)((char*)conn->arena_base) + conn->arena_capacity;
-  shttp_slab_init(pool);
-
-  conn->pool = pool;
+  spool_init(&conn->pool, ((char*)conn->arena_base) + conn->arena_offset, conn->arena_capacity - conn->arena_offset);
   return conn->callbacks->on_message_complete(&conn->inner);
 }
 

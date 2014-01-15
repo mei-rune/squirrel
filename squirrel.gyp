@@ -79,11 +79,9 @@
         'include/squirrel_hashtable.h',
         'include/squirrel_string.h',
         'include/squirrel_test.h',
-        'include/squirrel_slab.h',
         'include/squirrel_pool.h',
         'include/squirrel_util.h',
         'src/internal.h',
-        'src/slab.c',
         'src/connection.c',
         'src/request.c',
         'src/response.c',
@@ -175,11 +173,9 @@
         'include/squirrel_hashtable.h',
         'include/squirrel_string.h',
         'include/squirrel_test.h',
-        'include/squirrel_slab.h',
         'include/squirrel_pool.h',
         'include/squirrel_util.h',
         'src/internal.h',
-        'src/slab.c',
         'src/connection.c',
         'src/request.c',
         'src/response.c',
@@ -266,61 +262,5 @@
         ],
       }],
     }, # hello_world sample
-
-    ########################################
-    # pool_main sample
-    ########################################
-    {
-      'target_name': 'pool_main',
-      'product_name': 'pool_main',
-      'type': 'executable',
-
-      'dependencies': [
-        'squirrel',
-      ],
-      
-      'include_dirs': [
-        './include',
-      ],
-
-      'sources': [
-        'samples/pool_main.c',
-      ],
-
-      'copies': [
-      {
-        'destination': '<(PRODUCT_DIR)',
-        'files': [
-        ],
-      }],
-    }, # pool_main sample
-
-    ########################################
-    # pool_bench sample
-    ########################################
-    {
-      'target_name': 'pool_bench',
-      'product_name': 'pool_bench',
-      'type': 'executable',
-
-      'dependencies': [
-        'squirrel',
-      ],
-      
-      'include_dirs': [
-        './include',
-      ],
-
-      'sources': [
-        'samples/pool_bench.c',
-      ],
-
-      'copies': [
-      {
-        'destination': '<(PRODUCT_DIR)',
-        'files': [
-        ],
-      }],
-    }, # pool_bench sample
   ],
 }
