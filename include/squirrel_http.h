@@ -98,7 +98,7 @@ typedef struct shttp_s                 shttp_t;
 
 typedef int  (*shttp_data_cb) (shttp_connection_t*, const char *at, size_t length);
 typedef int  (*shttp_cb) (shttp_connection_t*);
-typedef void (*shttp_write_cb) (void *data);
+typedef void (*shttp_write_cb) (shttp_connection_t *conn, void *data);
 
 
 /**
@@ -233,17 +233,25 @@ struct shttp_request_s {
   shttp_header_t     headers;
 };
 
+#define SHTTP_CLOSE_CONNECTION_NONE  0
+#define SHTTP_CLOSE_CONNECTION_TRUE  1
+#define SHTTP_CLOSE_CONNECTION_FALSE 2
+
+#define SHTTP_THUNKED_NONE           0
+#define SHTTP_THUNKED_TRUE           1
+#define SHTTP_THUNKED_FALSE          2
+
 /**
  * @brief a structure containing all information for a http request.
  */
 struct shttp_response_s {
   uint16_t           http_major;
   uint16_t           http_minor;
-  uint64_t           status_code:16;
-  uint64_t           close_connection:1;
-  uint64_t           chunked:1;
-  uint64_t           head_writed:1;
-  uint64_t           reserved:13;
+  uint32_t           status_code:16;
+  uint32_t           close_connection:2;
+  uint32_t           chunked:2;
+  uint32_t           head_writed:1;
+  uint32_t           reserved:11;
 
   cstring_t          content_type;
   uint64_t           content_length;
@@ -266,14 +274,18 @@ struct shttp_write_cb_s {
 };
 
 /* Response codes */
-typedef intptr_t                      shttp_res;
-#define SHTTP_RES_OK                  0
-#define SHTTP_RES_ERROR               -1
-#define SHTTP_RES_MEMORY              -2
-#define SHTTP_RES_UV                  -3
-#define SHTTP_RES_NOTIMPLEMENT        -4
-#define SHTTP_RES_HEAD_WRITED         -5
-#define SHTTP_RES_HEAD_TOO_LARGE      -6
+typedef intptr_t                                    shttp_res;
+#define SHTTP_RES_OK                                0
+#define SHTTP_RES_ERROR                             -1
+#define SHTTP_RES_MEMORY                            -2
+#define SHTTP_RES_UV                                -3
+#define SHTTP_RES_NOTIMPLEMENT                      -4
+#define SHTTP_RES_HEAD_WRITED                       -5
+#define SHTTP_RES_HEAD_TOO_LARGE                    -6
+#define SHTTP_RES_HEAD_TRANSFER_ENCODING            -7
+#define SHTTP_RES_FREE_FLAG                         -8
+#define SHTTP_RES_INSUFFICIENT_WRITE_CB_BUFFER      -9
+#define SHTTP_RES_HEAD_CONNECTION                   -10
 
 DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 
@@ -288,31 +300,44 @@ DLL_VARIABLE shttp_res shttp_run(shttp_t *server);
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
 
 
-DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn, uint16_t status, cstring_t *content_type);
+DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
+                                            uint16_t status, 
+                                            const char *content_type,
+                                            size_t content_type_len);
 DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
 
-#define SHTTP_HEAD_COPY             (0)
-#define SHTTP_MEM_COPY              0
-#define SHTTP_MEM_NOFREE            1
-#define SHTTP_MEM_RESFREE           2
-#define SHTTP_MEM_CFREE             3
+#define SHTTP_MEM_POOL_FREE         1
+#define SHTTP_MEM_C_FREE            2
+#define SHTTP_MEM_MAX_FLAG          3
 
-#define SHTTP_HEAD_KEY_COPY         (SHTTP_MEM_COPY<<8)
-#define SHTTP_HEAD_KEY_NOFREE       (SHTTP_MEM_NOFREE<<8)
-#define SHTTP_HEAD_KEY_RESFREE      (SHTTP_MEM_RESFREE<<8)
-#define SHTTP_HEAD_KEY_CFREE        (SHTTP_MEM_CFREE<<8)
+#define SHTTP_HEAD_KEY_POOL_FREE    (SHTTP_MEM_POOL_FREE<<8)
+#define SHTTP_HEAD_KEY_CFREE        (SHTTP_MEM_C_FREE<<8)
+#define SHTTP_HEAD_VAL_POOL_FREE    SHTTP_MEM_POOL_FREE
+#define SHTTP_HEAD_VAL_CFREE        SHTTP_MEM_C_FREE
 
-#define SHTTP_HEAD_VAL_COPY         SHTTP_MEM_COPY
-#define SHTTP_HEAD_VAL_NOFREE       SHTTP_MEM_NOFREE
-#define SHTTP_HEAD_VAL_RESFREE      SHTTP_MEM_RESFREE
-#define SHTTP_HEAD_VAL_CFREE        SHTTP_MEM_CFREE
-
-DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_set_header_copy(shttp_connection_t *conn,
                                     const char *key,
                                     size_t     key_len,
                                     const char *value,
+                                    size_t     value_len);
+DLL_VARIABLE shttp_res shttp_response_set_header_nocopy(shttp_connection_t *conn,
+                                    const char *key,
+                                    size_t     key_len,
+                                    const char *value,
+                                    size_t     value_len);
+DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
+                                    char       *key,
+                                    size_t     key_len,
+                                    char       *value,
                                     size_t     value_len,
                                     int        flag);
+
+DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_connection_t *conn,
+                               const char *data,
+                               int length);
+DLL_VARIABLE shttp_res shttp_response_write_nocopy(shttp_connection_t *conn,
+                               const char *data,
+                               int length);
 DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
                                const char *data,
                                int length,

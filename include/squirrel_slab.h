@@ -44,6 +44,7 @@ struct shttp_slab_stat_s {
 
 DLL_VARIABLE void shttp_slab_init(shttp_slab_pool_t *pool);
 DLL_VARIABLE void *shttp_slab_alloc(shttp_slab_pool_t *pool, size_t size);
+DLL_VARIABLE void *shttp_slab_realloc(shttp_slab_pool_t *pool, void* p, size_t size);
 DLL_VARIABLE void shttp_slab_free(shttp_slab_pool_t *pool, void *p);
 
 DLL_VARIABLE void shttp_slab_dummy_init(shttp_slab_pool_t *pool);

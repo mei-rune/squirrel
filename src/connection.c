@@ -177,16 +177,19 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status) {
   assert(((char*)inner->outgoing.headers.array) == (((char*)inner) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                           http->settings.user_ctx_size, shttp_pagesize) +
                           (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
-  assert(inner->outgoing.headers.length == http->settings.max_headers_count);
+  assert(inner->outgoing.headers.capacity == http->settings.max_headers_count);
   assert(inner->outgoing.buffer.capacity == 256);
+  assert(inner->outgoing.write_cb_list.capacity == 2048);
+
   inner->outgoing.buffer.length = 0;
-  inner->outgoing.headers.length = 0;
+  inner->outgoing.write_cb_list.capacity = 0;
   inner->inner.response.headers.array = inner->outgoing.headers.array;
   inner->inner.response.headers.length = 0;
   inner->inner.response.http_major = inner->inner.request.http_major;
   inner->inner.response.http_minor = inner->inner.request.http_minor;
   inner->inner.response.status_code = SHTTP_STATUS_OK;
-  inner->inner.response.chunked = 0;
+  inner->inner.response.chunked = SHTTP_THUNKED_NONE;
+  inner->inner.response.close_connection = SHTTP_CLOSE_CONNECTION_NONE;
   
   rc = uv_accept(server_handle, (uv_stream_t*)&inner->uv_handle);
   if(rc) {

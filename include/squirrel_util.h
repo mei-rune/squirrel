@@ -161,4 +161,25 @@ DLL_VARIABLE_C int shttp_gettimeofday(struct timeval *tv, struct timezone *tz);
 #define shttp_gettimeofday  gettimeofday
 #endif
 
+
+#define LOG_HTTP(at, len, fmt, ...) _shttp_log_data(at, len, fmt "\n", __VA_ARGS__);
+#define LOG(level, ...) _shttp_log_printf(level, __VA_ARGS__)
+#define TRACE(...) _shttp_log_printf(SHTTP_LOG_DEBUG, __VA_ARGS__)
+#define WARN(...)  _shttp_log_printf(SHTTP_LOG_WARN, __VA_ARGS__)
+#define ERR(...) _shttp_log_printf(SHTTP_LOG_ERR, __VA_ARGS__)
+#define CRIT(...)  _shttp_log_printf(SHTTP_LOG_CRIT, __VA_ARGS__)
+
+// Log Functions
+void _shttp_log_data(const char* data, size_t len, const char* fmt, ...);
+extern void _shttp_log_printf(int severity, const char *fmt, ...);
+
+
+
+extern int shttp_win32_version;
+extern int shttp_ncpu;
+extern int shttp_cacheline_size;
+extern int shttp_pagesize;
+extern int shttp_pagesize_shift;
+DLL_VARIABLE_C void os_init();
+
 #endif //_INTERNAL_H_

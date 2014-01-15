@@ -147,27 +147,44 @@ cstring_t* _shttp_status_code_text(int status) {
 }
 
 
+#define CB_ARRAY_ADD(inner, func, func_data) if(inner->outgoing.write_cb_list.capacity <=            \
+                        inner->outgoing.write_cb_list.length) {                                      \
+      return SHTTP_RES_INSUFFICIENT_WRITE_CB_BUFFER;                                                 \
+    }                                                                                                \
+    inner->outgoing.write_cb_list.array[inner->outgoing.write_cb_list.length].cb = (func);           \
+    inner->outgoing.write_cb_list.array[inner->outgoing.write_cb_list.length].data = (func_data);    \
+    inner->outgoing.write_cb_list.length ++
+
+#define conn_malloc(inner, size) shttp_slab_alloc((inner)->pool, (size))
+#define conn_realloc(inner, p, size) shttp_slab_realloc((inner)->pool, (p), (size))
+#define conn_free(inner, p) shttp_slab_free((inner)->pool, (p))
+
+char* conn_strdup(shttp_connection_internal_t *inner, const char *c, size_t size) {
+  char * p;
+
+  p = (char*) conn_malloc(inner, size + 1);
+  if(nil == p) {
+    return nil;
+  }
+  memcpy(p, c, size+1);
+  return p;
+}
+
+
 DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
                                             uint16_t status,
-                                            cstring_t *content_type){
+                                            const char *content_type,
+                                            size_t content_type_len){
   shttp_connection_internal_t          *inner;
-  char                                 *c;
 
   inner = (shttp_connection_internal_t*)conn->internal;
   if(1 == inner->inner.response.head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
 
-  inner->inner.response.status_code = status;
-
-  c = (char*)shttp_slab_alloc(inner->pool, content_type->len);
-  if(nil == c) {
-    return SHTTP_RES_MEMORY;
-  }
-  memcpy(c, content_type->str, content_type->len);
-  
-  conn->response.content_type.str = c;
-  conn->response.content_type.len = content_type->len;
+  inner->inner.response.status_code = status;  
+  conn->response.content_type.str = content_type;
+  conn->response.content_type.len = content_type_len;
   return SHTTP_RES_OK;
 }
 
@@ -181,44 +198,203 @@ DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn){
   return SHTTP_RES_OK;
 }
 
-DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
+
+void shttp_head_pool_free (shttp_connection_t *conn, void *data) {
+  shttp_connection_internal_t          *inner;
+  inner = (shttp_connection_internal_t*)conn->internal;
+  shttp_slab_free(inner->pool, data);
+}
+
+void shttp_head_c_free (shttp_connection_t *conn, void *data) {
+  free(data);
+}
+
+#define EMPTY_FREE(X,Y)
+
+#define PREPORE_WRITE_HEADER(FREE_AFTER_WRITE, IMMEDIATE_FREE, CONTENT_FUNC)                        \
+  if(1 == inner->inner.response.head_writed) {                                                      \
+    return SHTTP_RES_HEAD_WRITED;                                                                   \
+  }                                                                                                 \
+  if(12 == key_len && 0 == strncmp("Content-Type", key, key_len)) {                                 \
+    CONTENT_FUNC();                                                                                 \
+    return SHTTP_RES_OK;                                                                            \
+  } else if(17 == key_len && 0 == strncmp("Transfer-Encoding", key, key_len)) {                     \
+    if(7 == value_len && 0 == strncasecmp("chunked", value, value_len)) {                           \
+      if(SHTTP_THUNKED_NONE == conn->response.chunked ||                                            \
+        SHTTP_THUNKED_TRUE ==  conn->response.chunked) {                                            \
+        conn->response.chunked = SHTTP_THUNKED_TRUE;                                                \
+                                                                                                    \
+        IMMEDIATE_FREE(key_flag, key);                                                              \
+        IMMEDIATE_FREE(val_flag, value);                                                            \
+        return SHTTP_RES_OK;                                                                        \
+      }                                                                                             \
+    }                                                                                               \
+    return SHTTP_RES_HEAD_TRANSFER_ENCODING;                                                        \
+  } else if(10 == key_len && 0 == strncmp("Connection", key, key_len)) {                            \
+    if(5 == value_len && 0 == strncasecmp("close", value, value_len)) {                             \
+       if(SHTTP_CLOSE_CONNECTION_NONE == conn->response.close_connection ||                         \
+        SHTTP_CLOSE_CONNECTION_TRUE ==  conn->response.close_connection) {                          \
+        conn->response.close_connection = SHTTP_CLOSE_CONNECTION_TRUE;                              \
+                                                                                                    \
+        IMMEDIATE_FREE(key_flag, key);                                                              \
+        IMMEDIATE_FREE(val_flag, value);                                                            \
+        return SHTTP_RES_OK;                                                                        \
+      }                                                                                             \
+    } else if(10 == value_len && 0 == strncasecmp("keep-alive", value, value_len)) {                \
+      if(SHTTP_CLOSE_CONNECTION_NONE == conn->response.close_connection ||                          \
+        SHTTP_CLOSE_CONNECTION_FALSE ==  conn->response.close_connection) {                         \
+        conn->response.close_connection = SHTTP_CLOSE_CONNECTION_FALSE;                             \
+                                                                                                    \
+        IMMEDIATE_FREE(key_flag, key);                                                              \
+        IMMEDIATE_FREE(val_flag, value);                                                            \
+        return SHTTP_RES_OK;                                                                        \
+      }                                                                                             \
+    }                                                                                               \
+    return SHTTP_RES_HEAD_CONNECTION;                                                               \
+  }
+
+DLL_VARIABLE shttp_res shttp_response_set_header_copy(shttp_connection_t *conn,
                                     const char *key,
                                     size_t     key_len,
                                     const char *value,
+                                    size_t     value_len) {
+  shttp_connection_internal_t          *inner;
+  char                                 *key_copy;
+  char                                 *val_copy;
+
+  inner = (shttp_connection_internal_t*)conn->internal;
+
+
+#define content_set_with_free_val()                                                                 \
+    val_copy = conn_strdup(inner, value, value_len);                                                \
+    if(nil == val_copy) {                                                                           \
+      return SHTTP_RES_MEMORY;                                                                      \
+    }                                                                                               \
+    conn->response.content_type.str = val_copy;                                                     \
+    conn->response.content_type.len = value_len;                                                    \
+    CB_ARRAY_ADD(inner, &shttp_head_pool_free, val_copy)
+
+
+  PREPORE_WRITE_HEADER(EMPTY_FREE, EMPTY_FREE, content_set_with_free_val);
+
+  if(conn->request.headers.length >= inner->outgoing.headers.capacity) {
+    return SHTTP_RES_HEAD_TOO_LARGE;
+  }
+
+  key_copy = conn_strdup(inner, key, key_len);
+  if(nil == key_copy) {
+    return SHTTP_RES_MEMORY;
+  }
+  val_copy = conn_strdup(inner, value, value_len);
+  if(nil == val_copy) {
+    return SHTTP_RES_MEMORY;
+  }
+
+  conn->request.headers.array[conn->request.headers.length].key.str = key_copy;
+  conn->request.headers.array[conn->request.headers.length].key.len = key_len;
+  conn->request.headers.array[conn->request.headers.length].val.str = val_copy;
+  conn->request.headers.array[conn->request.headers.length].val.len = value_len;
+
+  CB_ARRAY_ADD(inner, &shttp_head_pool_free, key_copy);
+  CB_ARRAY_ADD(inner, &shttp_head_pool_free, val_copy);
+  conn->request.headers.length += 1;
+
+  return SHTTP_RES_OK;
+}
+DLL_VARIABLE shttp_res shttp_response_set_header_nocopy(shttp_connection_t *conn,
+                                    const char *key,
+                                    size_t     key_len,
+                                    const char *value,
+                                    size_t     value_len) {
+  shttp_connection_internal_t          *inner;
+  inner = (shttp_connection_internal_t*)conn->internal;
+
+  #define content_set_with_no_free()                                                                \
+    conn->response.content_type.str = value;                                                        \
+    conn->response.content_type.len = value_len
+
+  
+  PREPORE_WRITE_HEADER(EMPTY_FREE, EMPTY_FREE, content_set_with_no_free);
+
+  if(conn->request.headers.length >= inner->outgoing.headers.capacity) {
+    return SHTTP_RES_HEAD_TOO_LARGE;
+  }
+
+  conn->request.headers.array[conn->request.headers.length].key.str = key;
+  conn->request.headers.array[conn->request.headers.length].key.len = key_len;
+  conn->request.headers.array[conn->request.headers.length].val.str = value;
+  conn->request.headers.array[conn->request.headers.length].val.len = value_len;
+  conn->request.headers.length += 1;
+
+  return SHTTP_RES_OK;
+}
+
+
+DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
+                                    char       *key,
+                                    size_t     key_len,
+                                    char       *value,
                                     size_t     value_len,
                                     int        flag) {
   shttp_connection_internal_t          *inner;
+  int                                  key_flag;
+  int                                  val_flag;
   inner = (shttp_connection_internal_t*)conn->internal;
   
-  if(1 == inner->inner.response.head_writed) {
-    return SHTTP_RES_HEAD_WRITED;
-  }
-  //#define HTTP_RESPONSE_HEADERS_CHUNKED \
-//    "HTTP/1.1 %d %s\r\n" \
-//    "Connection: %s\r\n" \
-//    "Content-Type: %s\r\n" \
-//    "Transfer-Encoding: chunked\r\n" \
-//    "%s\r\n"
+  key_flag = (flag >>8);
+  val_flag = (flag & 0xff);
 
-  if(12 == key_len && 0 == strncmp("Content-Type", key, key_len)) {
+  assert(0 < key_flag < SHTTP_MEM_MAX_FLAG);
+  assert(0 < val_flag < SHTTP_MEM_MAX_FLAG);
 
-  } else if(17 == key_len && 0 == strncmp("Transfer-Encoding", key, key_len) &&
-    7 == value_len && 0 == strncmp("chunked", value, value_len)) {
-      conn->response.chunked = 1;
-  } else if(10 == key_len && 0 == strncmp("Connection", key, key_len) &&
-    5 == value_len && 0 == strncmp("close", value, value_len)) {
-      conn->response.close_connection = 1;
-  } else {
-    if(conn->request.headers.length >= inner->outgoing.headers.length) {
-      return SHTTP_RES_HEAD_TOO_LARGE;
-    }
-    conn->request.headers.array[conn->request.headers.length].key.str = key;
-    conn->request.headers.array[conn->request.headers.length].key.len = key_len;
-    conn->request.headers.array[conn->request.headers.length].val.str = value;
-    conn->request.headers.array[conn->request.headers.length].val.len = value_len;
-    conn->request.headers.length += 1;
-  }
+#define free_after_write(fg, data)                                                                   \
+    do { switch (fg) {                                                                               \
+    case SHTTP_MEM_POOL_FREE:                                                                        \
+      CB_ARRAY_ADD(inner, &shttp_head_pool_free, (void*)data);                                       \
+      break;                                                                                         \
+    case SHTTP_MEM_C_FREE:                                                                           \
+      CB_ARRAY_ADD(inner, &shttp_head_c_free, (void*)data);                                          \
+      break;                                                                                         \
+    default:                                                                                         \
+      assert(false);                                                                                 \
+      return SHTTP_RES_FREE_FLAG;                                                                    \
+    } }while(0)
+
   
+#define immediate_free(fg, data)                                                                     \
+    do { switch (fg) {                                                                               \
+    case SHTTP_MEM_POOL_FREE:                                                                        \
+      shttp_head_pool_free(conn, (void*)data);                                                       \
+      break;                                                                                         \
+    case SHTTP_MEM_C_FREE:                                                                           \
+      shttp_head_c_free(conn, (void*)data);                                                          \
+      break;                                                                                         \
+    default:                                                                                         \
+      assert(false);                                                                                 \
+      return SHTTP_RES_FREE_FLAG;                                                                    \
+    } }while(0)
+
+  
+#define content_set_and_free()                                                                       \
+    conn->response.content_type.str = value;                                                         \
+    conn->response.content_type.len = value_len;                                                     \
+    immediate_free(key_flag, key);                                                                   \
+    free_after_write(val_flag, value)
+
+  PREPORE_WRITE_HEADER(free_after_write, immediate_free, content_set_and_free);
+
+  if(conn->request.headers.length >= inner->outgoing.headers.capacity) {
+    return SHTTP_RES_HEAD_TOO_LARGE;
+  }
+
+  conn->request.headers.array[conn->request.headers.length].key.str = key;
+  conn->request.headers.array[conn->request.headers.length].key.len = key_len;
+  conn->request.headers.array[conn->request.headers.length].val.str = value;
+  conn->request.headers.array[conn->request.headers.length].val.len = value_len;
+
+  free_after_write(key_flag, key);
+  free_after_write(val_flag, value);
+  conn->request.headers.length += 1;
   return SHTTP_RES_OK;
 }
 DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,

@@ -123,12 +123,17 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
     conn->outgoing.headers.array = (shttp_kv_t*) ((char*)conn) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                           http->settings.user_ctx_size, shttp_pagesize) +
                           (sizeof(shttp_kv_t) * http->settings.max_headers_count);
-    conn->outgoing.headers.length = http->settings.max_headers_count;
+    conn->outgoing.headers.capacity = http->settings.max_headers_count;
+    conn->outgoing.buffer.capacity = 256;
+    conn->outgoing.buffer.length = 0;
+    conn->outgoing.write_cb_list.capacity = 2048;
+    conn->outgoing.write_cb_list.length = 0;
 
     conn->arena_base = ((char*)conn) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                           http->settings.user_ctx_size, shttp_pagesize) +
                           (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
     conn->arena_capacity = http->settings.rw_buffer_size;
+    conn->arena_offset = 0;
 
     TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
   }

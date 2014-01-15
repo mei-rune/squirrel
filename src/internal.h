@@ -73,15 +73,27 @@ typedef struct shttp_incomming_s {
   size_t                             headers_bytes_count;
 } shttp_incomming_t;
 
+typedef struct shttp_kv_buffer_s {
+  size_t      capacity;
+  shttp_kv_t  *array;
+} shttp_kv_buffer_t;
+
 typedef struct shttp_send_buffer_s {
   size_t      capacity;
   size_t      length;
-  shttp_kv_t  array[256];
+  uv_buf_t    array[256];
 } shttp_send_buffer_t;
 
+typedef struct shttp_write_cb_buffer_s {
+  size_t           capacity;
+  size_t           length;
+  shttp_write_cb_t array[2048];
+} shttp_write_cb_buffer_t;
+
 typedef struct shttp_outgoing_s {
-  shttp_send_buffer_t buffer;
-  shttp_header_t      headers;
+  shttp_send_buffer_t     buffer;
+  shttp_write_cb_buffer_t write_cb_list;
+  shttp_kv_buffer_t       headers;
 } shttp_outgoing_t;
 
 typedef struct shttp_connection_internal_s {
@@ -117,26 +129,6 @@ struct shttp_s {
         ERR("%s: %s\n", msg, uv_strerror(r));     \
         return SHTTP_RES_UV;                      \
     }
-
-#define LOG_HTTP(at, len, fmt, ...) _shttp_log_data(at, len, fmt "\n", __VA_ARGS__);
-#define LOG(level, ...) _shttp_log_printf(level, __VA_ARGS__)
-#define TRACE(...) _shttp_log_printf(SHTTP_LOG_DEBUG, __VA_ARGS__)
-#define WARN(...)  _shttp_log_printf(SHTTP_LOG_WARN, __VA_ARGS__)
-#define ERR(...) _shttp_log_printf(SHTTP_LOG_ERR, __VA_ARGS__)
-#define CRIT(...)  _shttp_log_printf(SHTTP_LOG_CRIT, __VA_ARGS__)
-
-// Log Functions
-void _shttp_log_data(const char* data, size_t len, const char* fmt, ...);
-extern void _shttp_log_printf(int severity, const char *fmt, ...);
-
-
-
-extern int shttp_win32_version;
-extern int shttp_ncpu;
-extern int shttp_cacheline_size;
-extern int shttp_pagesize;
-extern int shttp_pagesize_shift;
-extern void os_init();
 
 #ifdef __cplusplus
 }
