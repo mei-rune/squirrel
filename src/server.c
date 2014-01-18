@@ -110,6 +110,7 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
 
     conn->inner.http = http;
     conn->inner.internal = conn;
+    conn->inner.pool = &conn->pool;
     conn->inner.ctx = ((char*)conn) + shttp_mem_align(sizeof(shttp_connection_internal_t));
     conn->callbacks = &http->settings.callbacks;
     
@@ -124,10 +125,10 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
                           http->settings.user_ctx_size, shttp_pagesize) +
                           (sizeof(shttp_kv_t) * http->settings.max_headers_count);
     conn->outgoing.headers.capacity = http->settings.max_headers_count;
-    conn->outgoing.buffer.capacity = 256;
-    conn->outgoing.buffer.length = 0;
-    conn->outgoing.write_cb_list.capacity = 2048;
-    conn->outgoing.write_cb_list.length = 0;
+    conn->outgoing.write_buffers.capacity = 256;
+    conn->outgoing.write_buffers.length = 0;
+    conn->outgoing.call_after_writed.capacity = 2048;
+    conn->outgoing.call_after_writed.length = 0;
 
     conn->arena_base = ((char*)conn) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                           http->settings.user_ctx_size, shttp_pagesize) +

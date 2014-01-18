@@ -54,7 +54,12 @@ typedef struct sbuffer_s {
 
 #define  SSTRING_BUFFER_DEFAULT  { 0, NULL, 0 }
 
-#define  sbuffer_init(s, p, l, c) (s)->str = p; (s)->len = l; (s)->capacity = c
+#define  sbuffer_init(s, p, l, c) (s).str = p; (s).len = l; (s).capacity = c
+#define  sbuffer_unused_size(s) ((s).capacity - (s).len)
+#define  sbuffer_unused_addr(s) ((s).str + (s).len)
+#define  sbuffer_length_add(s, l) (s).len += l
+#define  sbuffer_length_set(s, l) (s).len = l
+#define  sbuffer_length(s)        (s).len
 
 DLL_VARIABLE void sbuffer_destroy(sbuffer_t* pcs);
 

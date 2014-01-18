@@ -78,11 +78,11 @@ typedef struct shttp_kv_buffer_s {
   shttp_kv_t  *array;
 } shttp_kv_buffer_t;
 
-typedef struct shttp_send_buffer_s {
+typedef struct shttp_buffers_s {
   size_t      capacity;
   size_t      length;
   uv_buf_t    array[256];
-} shttp_send_buffer_t;
+} shttp_buffers_t;
 
 typedef struct shttp_write_cb_buffer_s {
   size_t           capacity;
@@ -91,9 +91,11 @@ typedef struct shttp_write_cb_buffer_s {
 } shttp_write_cb_buffer_t;
 
 typedef struct shttp_outgoing_s {
-  shttp_send_buffer_t     buffer;
-  shttp_write_cb_buffer_t write_cb_list;
   shttp_kv_buffer_t       headers;
+  shttp_buffers_t         write_buffers;
+  shttp_write_cb_buffer_t call_after_writed;
+  sstring_t               content_type;
+  sbuffer_t               head_buffer;
 } shttp_outgoing_t;
 
 typedef struct shttp_connection_internal_s {

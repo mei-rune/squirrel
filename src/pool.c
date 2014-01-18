@@ -5,6 +5,7 @@
 
 
 #define SPOOL_MAGIC ((uint16_t)0xabcd)
+#define SPOOL_COOKIE ((uint32_t)0xfdfd)
 
 
 #define shttp_memzero(p, size)        memset(p, 0, size)
@@ -12,9 +13,36 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+  
+#define PTR_OFFSET                       SPOOL_BLOCK_HEAD_USED_SIZE
+#define BLOCK_TO_PTR(block)              (((char*)block) + PTR_OFFSET)
+#define PTR_TO_BLOCK(p)                  ((spool_block_t*)(((char*)p) - PTR_OFFSET))
 
-#define BLOCK_TO_PTR(block)  (((char*)block) + sizeof(spool_block_t))
-#define PTR_TO_BLOCK(p)      ((spool_block_t*)(((char*)p) - sizeof(spool_block_t)))
+
+
+#ifdef DEBUG
+#define spool_junk(p, size)           memset(p, 0xA5, size)
+#define spool_set_cookie(p)           *((uint32_t*)(p)) = SPOOL_COOKIE
+#define spool_set_used_size(b, size)  (b)->used_size = size
+#define spool_cookie_addr(b)          (((char*)b) + SPOOL_BLOCK_HEAD_USED_SIZE + (b)->used_size)
+#define assert_cookie(b)              if(nil != cookie_cb) {                                 \
+      if(SPOOL_COOKIE != *(uint32_t*) spool_cookie_addr(b)) {                                \
+        cookie_cb(PTR_TO_BLOCK(b));                                                          \
+      }                                                                                      \
+    } else {                                                                                 \
+      assert(SPOOL_COOKIE == *(uint32_t*) spool_cookie_addr(b));                             \
+    }
+#else
+#define spool_junk(p, size)
+#define spool_set_cookie(p)
+#define spool_set_used_size(b, size)
+#define assert_cookie(b)
+#endif
+
+#ifdef DEBUG
+typedef void (*cookie_cb_t)(void*);
+cookie_cb_t cookie_cb;
+#endif
 
 DLL_VARIABLE void spool_init(spool_t *pool, char* p, size_t capacity) {
   int i;
@@ -35,6 +63,7 @@ DLL_VARIABLE void spool_init(spool_t *pool, char* p, size_t capacity) {
   pool->addr = p;
   pool->start = p;
   pool->capacity = capacity;
+  pool->transacting = 0;
 }
 
 DLL_VARIABLE void *spool_malloc(spool_t *pool, size_t size) {
@@ -42,6 +71,9 @@ DLL_VARIABLE void *spool_malloc(spool_t *pool, size_t size) {
   spool_block_t    *block;
   char             *end;
 
+  if(0 != pool->transacting) {
+    return nil;
+  }
   if(size >= pool->capacity) {
     return nil;
   }
@@ -89,7 +121,7 @@ DLL_VARIABLE void *spool_malloc(spool_t *pool, size_t size) {
 
 block_lookup_end:
   if (nil == block) {
-    end = pool->start + shttp_align(size + sizeof(spool_block_t) , shttp_cacheline_size);
+    end = pool->start + spool_alloc_size(size);
     if(end > (pool->addr + pool->capacity)) {
       return nil;
     }
@@ -98,13 +130,16 @@ block_lookup_end:
     
     memset(block, 0, sizeof(spool_block_t));
     block->magic = SPOOL_MAGIC;
-    block->capacity = (uint32_t)(end - (char*)block) -  sizeof(spool_block_t);
+    block->capacity = (uint32_t)((end - (char*)block) - SPOOL_BLOCK_USED_SIZE);
     TAILQ_INSERT_TAIL(&pool->all, block, all_next);
   } else {
     TAILQ_REMOVE(&pool->free_slots[i], block, free_next);
   }
   
   block->used = 1;
+  spool_set_used_size(block, size);
+  spool_junk(BLOCK_TO_PTR(block), size);
+  spool_set_cookie(BLOCK_TO_PTR(block) + size);
   return BLOCK_TO_PTR(block);
 }
 
@@ -123,6 +158,63 @@ block_lookup_end:
   }
 
 
+
+static inline void *_spool_try_realloc(spool_t *pool, spool_block_t *block, char* p, size_t size) {
+  size_t           s, new_capacity, slot;
+  spool_block_t    *next;
+  void             *new_ptr;
+
+  next = TAILQ_NEXT(block, all_next);
+  if(nil == next) {
+    new_capacity = spool_alloc_size(size) - SPOOL_BLOCK_USED_SIZE;
+    pool->start += (new_capacity - block->capacity);
+    block->capacity = new_capacity;
+    
+    spool_set_used_size(block, size);
+    spool_set_cookie(BLOCK_TO_PTR(block) + size);
+    return p;
+  }
+
+  if(0 != next->used) {
+    return nil;
+  }
+
+  new_capacity = (BLOCK_TO_PTR(next) - BLOCK_TO_PTR(block)) + next->capacity;
+  if(size > new_capacity) {
+    return nil;
+  }
+  
+  calc_slot(slot, next->capacity);
+  TAILQ_REMOVE(&pool->free_slots[slot], next, free_next);
+  TAILQ_REMOVE(&pool->all, next, all_next);
+  block->capacity = new_capacity;
+
+  spool_set_used_size(block, size);
+  spool_set_cookie(p + size);
+  return p;
+}
+
+DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size) {
+  size_t           s, new_capacity, slot;
+  spool_block_t    *block, *next;
+  void             *new_ptr;
+
+  block = PTR_TO_BLOCK(p);
+  assert(SPOOL_MAGIC == block->magic);
+  
+  if(size <= block->capacity) {
+    spool_set_used_size(block, size);
+    spool_set_cookie(BLOCK_TO_PTR(block) + size);
+    return p;
+  }
+
+  if(0 != pool->transacting) {
+    return nil;
+  }
+
+  return _spool_try_realloc(pool, block, (char*)p, size);
+}
+
 DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size) {
   size_t           s, new_capacity, slot;
   spool_block_t    *block, *next;
@@ -130,35 +222,21 @@ DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size) {
 
   block = PTR_TO_BLOCK(p);
   assert(SPOOL_MAGIC == block->magic);
-
+  
   if(size <= block->capacity) {
+    spool_set_used_size(block, size);
+    spool_set_cookie(BLOCK_TO_PTR(block) + size);
     return p;
   }
-  
-  next = TAILQ_NEXT(block, all_next);
-  if(nil == next) {
-    new_capacity = shttp_align(size + sizeof(spool_block_t), shttp_cacheline_size) - sizeof(spool_block_t);
-    pool->start += (new_capacity - block->capacity);
-    block->capacity = new_capacity;
-    return p;
-  }
-
-  if(0 != next->used) {
-    goto failed;
-  }
-
-  new_capacity = (BLOCK_TO_PTR(next) - BLOCK_TO_PTR(block)) + next->capacity;
-  if(size > new_capacity) {
-    goto failed;
+  if(0 != pool->transacting) {
+    return nil;
   }
   
-  calc_slot(slot, next->capacity);
-  TAILQ_REMOVE(&pool->free_slots[slot], next, free_next);
-  TAILQ_REMOVE(&pool->all, next, all_next);
-  block->capacity = new_capacity;
-  return p;
+  new_ptr = _spool_try_realloc(pool, block, (char*)p, size);
+  if(nil != new_ptr) {
+    return new_ptr;
+  }
 
-failed:
   new_ptr = spool_malloc(pool, size);
   if(nil == new_ptr) {
     return nil;
@@ -174,6 +252,7 @@ DLL_VARIABLE void spool_free(spool_t *pool, void *p) {
 
   block = PTR_TO_BLOCK(p);
   assert(SPOOL_MAGIC == block->magic);
+  assert_cookie(block);
 
   for(;;) {
     next = TAILQ_NEXT(block, all_next);
@@ -198,8 +277,8 @@ DLL_VARIABLE void spool_free(spool_t *pool, void *p) {
 
     prev->capacity = (BLOCK_TO_PTR(block) - BLOCK_TO_PTR(prev)) + block->capacity;
   }
-
-  if(nil == next) {
+  
+  if(0 == pool->transacting && nil == next) {
     TAILQ_REMOVE(&pool->all, block, all_next);
     
     if(nil == prev) {
@@ -221,6 +300,45 @@ DLL_VARIABLE void spool_free(spool_t *pool, void *p) {
   
   block->used = 0;
   TAILQ_INSERT_TAIL(&pool->free_slots[slot], block, free_next);
+}
+
+DLL_VARIABLE int spool_prepare_alloc(spool_t *pool, sbuf_t *buf) {
+  if(0 != pool->transacting) {
+    return -11;
+  }
+  pool->transacting = 1;
+  buf->str =BLOCK_TO_PTR( pool->start);
+  buf->len = pool->capacity - (pool->start - pool->addr) - SPOOL_BLOCK_USED_SIZE;
+  return 0;
+}
+
+DLL_VARIABLE void spool_rollback_alloc(spool_t *pool) {
+  pool->transacting = 0;
+}
+
+DLL_VARIABLE void* spool_commit_alloc(spool_t *pool, size_t size) {
+  char          *end;
+  spool_block_t *block;
+
+  assert(0 != pool->transacting);
+  pool->transacting = 0;
+  
+  end = pool->start + spool_alloc_size(size);
+  if(end > (pool->addr + pool->capacity)) {
+    return nil;
+  }
+
+  block = (spool_block_t*)pool->start;
+  pool->start = end;
+    
+  memset(block, 0, sizeof(spool_block_t));
+  block->magic = SPOOL_MAGIC;
+  block->used = 1;
+  block->capacity = (uint32_t)((end - (char*)block) - SPOOL_BLOCK_USED_SIZE);
+  spool_set_used_size(block, size);
+  spool_set_cookie(BLOCK_TO_PTR(block) + size);
+  TAILQ_INSERT_TAIL(&pool->all, block, all_next);
+  return BLOCK_TO_PTR(block);
 }
 
 DLL_VARIABLE void spool_stat(spool_t *pool) {

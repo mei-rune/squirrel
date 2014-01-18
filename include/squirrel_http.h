@@ -262,6 +262,7 @@ struct shttp_connection_s {
   shttp_t           *http;
   shttp_request_t   request;
   shttp_response_t  response;
+  spool_t           *pool;
   void              *ctx;
   void              *internal;
 };
@@ -273,8 +274,10 @@ struct shttp_write_cb_s {
   void *data;
 };
 
-/* Response codes */
-typedef intptr_t                                    shttp_res;
+/** @name Response codes
+ */
+/**@{*/
+typedef int                                        shttp_res;
 #define SHTTP_RES_OK                                0
 #define SHTTP_RES_ERROR                             -1
 #define SHTTP_RES_MEMORY                            -2
@@ -286,7 +289,24 @@ typedef intptr_t                                    shttp_res;
 #define SHTTP_RES_FREE_FLAG                         -8
 #define SHTTP_RES_INSUFFICIENT_WRITE_CB_BUFFER      -9
 #define SHTTP_RES_HEAD_CONNECTION                   -10
+#define SHTTP_RES_IN_TRANSACTION                    -11
+#define SHTTP_RES_INSUFFICIENT_WRITE_BUFFER         -12
+#define SHTTP_RES_HEAD_LINE_TOO_LARGE               -13
+#define SHTTP_RES_ERROR_STATUS_CODE                 -14
+#define SHTTP_RES_PRINTF                             -15
+/**@}*/
 
+#define SHTTP_DELIMITER_STR ": "
+#define SHTTP_DELIMITER_INT ((uint16_t)0x3a20)
+#define SHTTP_DELIMITER_LEN 2
+#define SHTTP_CRLF_STR      "\r\n"
+#define SHTTP_CRLF_INT      ((uint16_t)0x0d0a)
+#define SHTTP_CRLF_LEN      2
+
+
+/** @name http server methods
+ */
+/**@{*/
 DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 
 /**
@@ -298,40 +318,26 @@ DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char *listen_addr, short port);
 DLL_VARIABLE shttp_res shttp_run(shttp_t *server);
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
+/**@}*/
 
-
+/** @name http response methods
+ */
+/**@{*/
 DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
                                             uint16_t status, 
                                             const char *content_type,
                                             size_t content_type_len);
 DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
-
-#define SHTTP_MEM_POOL_FREE         1
-#define SHTTP_MEM_C_FREE            2
-#define SHTTP_MEM_MAX_FLAG          3
-
-#define SHTTP_HEAD_KEY_POOL_FREE    (SHTTP_MEM_POOL_FREE<<8)
-#define SHTTP_HEAD_KEY_CFREE        (SHTTP_MEM_C_FREE<<8)
-#define SHTTP_HEAD_VAL_POOL_FREE    SHTTP_MEM_POOL_FREE
-#define SHTTP_HEAD_VAL_CFREE        SHTTP_MEM_C_FREE
-
-DLL_VARIABLE shttp_res shttp_response_set_header_copy(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *conn,
                                     const char *key,
                                     size_t     key_len,
                                     const char *value,
                                     size_t     value_len);
-DLL_VARIABLE shttp_res shttp_response_set_header_nocopy(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *conn,
                                     const char *key,
                                     size_t     key_len,
-                                    const char *value,
-                                    size_t     value_len);
-DLL_VARIABLE shttp_res shttp_response_set_header(shttp_connection_t *conn,
-                                    char       *key,
-                                    size_t     key_len,
-                                    char       *value,
-                                    size_t     value_len,
-                                    int        flag);
-
+                                    const char *fmt,
+                                    ...);
 DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_connection_t *conn,
                                const char *data,
                                int length);
@@ -344,6 +350,17 @@ DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
                                shttp_write_cb cb,
                                void *cb_data);
 DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
+/**@}*/
+
+
+/** @name http utility methods
+ */
+/**@{*/
+DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
+
+DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *conn, void *data);
+
+DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data);
 
 /**
   A callback function used to intercept Libevent's log messages.
@@ -363,6 +380,7 @@ typedef void (*shttp_log_cb_t)(int severity, const char *fmt, va_list ap);
   functionality.  Doing so can produce undefined behavior.
   */
 DLL_VARIABLE void shttp_set_log_callback(shttp_log_cb_t cb);
+/**@}*/
 
 #ifdef __cplusplus
 };

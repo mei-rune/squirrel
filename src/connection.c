@@ -148,33 +148,33 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status) {
   
   memset(&inner->inner.request, 0, sizeof(shttp_request_t));
   memset(&inner->inner.response, 0, sizeof(shttp_response_t));
-  
+  assert(inner->inner.http == http);
+  assert(inner->inner.internal == inner);
+  assert(inner->inner.pool == &inner->pool);
   assert(((char*)inner->incomming.headers.array) == (((char*)inner) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                           http->settings.user_ctx_size, shttp_pagesize)));
   assert(inner->incomming.headers.capacity == http->settings.max_headers_count);
   assert(inner->callbacks == &inner->inner.http->settings.callbacks);
   assert(inner->incomming.conn == inner->inner.internal);
-  assert(inner->inner.http == http);
-  assert(inner->inner.internal == inner);
+
   
   inner->incomming.headers.length = 0;
   inner->incomming.headers_bytes_count = 0;
   inner->incomming.status = shttp_message_begin;
   http_parser_init(&inner->incomming.parser, HTTP_REQUEST);
   inner->incomming.parser.data = &inner->incomming;
-
-
-
   
   assert(((char*)inner->outgoing.headers.array) == (((char*)inner) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                           http->settings.user_ctx_size, shttp_pagesize) +
                           (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
   assert(inner->outgoing.headers.capacity == http->settings.max_headers_count);
-  assert(inner->outgoing.buffer.capacity == 256);
-  assert(inner->outgoing.write_cb_list.capacity == 2048);
+  assert(inner->outgoing.write_buffers.capacity == 256);
+  assert(inner->outgoing.call_after_writed.capacity == 2048);
+  assert(inner->outgoing.content_type.len == 0);
+  assert(inner->outgoing.content_type.str == nil);
 
-  inner->outgoing.buffer.length = 0;
-  inner->outgoing.write_cb_list.capacity = 0;
+  inner->outgoing.write_buffers.length = 0;
+  inner->outgoing.call_after_writed.length = 0;
   inner->inner.response.headers.array = inner->outgoing.headers.array;
   inner->inner.response.headers.length = 0;
   inner->inner.response.http_major = inner->inner.request.http_major;
