@@ -321,6 +321,7 @@ TEST(http, simple) {
 TEST(http, create_and_free) {
   shttp_settings_t settings;
   shttp_t          *srv;
+  uv_thread_t      tid;
 
   memset(&settings, 0, sizeof(shttp_settings_t));
   settings.user_ctx_size = sizeof(usr_context_t);
@@ -328,7 +329,10 @@ TEST(http, create_and_free) {
   settings.callbacks.on_message_begin = &on_message_begin;
   settings.callbacks.on_body = &on_body;
   settings.callbacks.on_message_complete = &on_message_complete;
-  srv = shttp_create(&settings);
-  ASSERT_NE(nil, srv);
+  ASSERT_NE(nil, (srv = shttp_create(&settings)));
+  ASSERT_EQ(SHTTP_RES_OK, shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT));
+  uv_thread_create(&tid, &start_web, srv);
+  ASSERT_EQ(SHTTP_RES_OK, shttp_shutdown(srv));
+  uv_thread_join(&tid);
   shttp_free(srv);
 }
