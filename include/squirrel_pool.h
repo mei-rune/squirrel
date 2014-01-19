@@ -22,7 +22,7 @@ typedef struct spool_block_s {
   uint32_t                    used_size;
 #endif
   uint32_t                    capacity;
-  
+
   TAILQ_ENTRY(spool_block_s) all_next;
   TAILQ_ENTRY(spool_block_s) free_next;
 } spool_block_t;
@@ -51,7 +51,7 @@ typedef struct spool_s {
 
   char                *start;
 
-  
+
   uint16_t                    transacting:1;
   uint16_t                    reserved1:15;
   uint32_t                    reserved2;

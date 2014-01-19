@@ -121,7 +121,7 @@ static int _http_request_on_header_field(http_parser *inner, const char *at, siz
   case shttp_message_value:
     incomming->status = shttp_message_field;
     incomming->headers.length +=1;
-    if(incomming->headers.capacity >= incomming->headers.length) {
+    if(incomming->headers.capacity <= incomming->headers.length) {
       ERR("parse error: header length too large.");
       return -1;
     }
@@ -139,7 +139,7 @@ static int _http_request_on_header_field(http_parser *inner, const char *at, siz
 
 static int _http_request_on_header_value(http_parser *inner, const char *at, size_t length) {
   shttp_incomming_t               *incomming;
-  
+
 #define current_header incomming->headers.array[incomming->headers.length]
 
   incomming = (shttp_incomming_t*)inner->data;

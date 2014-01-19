@@ -49,7 +49,7 @@ size_t calc_free_slot2(size_t factor, size_t bytes) {
 size_t all_queue_size(spool_t *pool) {
   spool_block_t    *block;
   size_t count = 0;
-  
+
   TAILQ_FOREACH(block, &pool->all, all_next) {
     count ++;
   }
@@ -59,7 +59,7 @@ size_t all_queue_size(spool_t *pool) {
 size_t free_queue_size(spool_t *pool, size_t slot) {
   spool_block_t    *block;
   size_t count = 0;
-  
+
   TAILQ_FOREACH(block, &pool->free_slots[slot], free_next) {
     count ++;
   }
@@ -69,7 +69,7 @@ size_t free_queue_size(spool_t *pool, size_t slot) {
 void test_pool_once(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1;
-   
+
   m1 = spool_test_malloc(pool, bytes);
   slot = calc_free_slot2(1, bytes);
   ASSERT_EQ(1, all_queue_size(pool));
@@ -95,14 +95,14 @@ void test_pool_once(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool_reused(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1, *m1_1, *m2;
-   
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
   ASSERT_EQ(2, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
-  
+
   slot = calc_free_slot2(1, bytes);
   spool_free(pool, m1);
   ASSERT_EQ(2, all_queue_size(pool));
@@ -121,7 +121,7 @@ void test_pool_reused(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 
   ASSERT_EQ(m1, m1_1);
 
-  
+
   spool_free(pool, m1_1);
   spool_free(pool, m2);
   ASSERT_EQ(pool->start, pool->addr);
@@ -135,14 +135,14 @@ void test_pool_reused(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool_reused2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1, *m1_1, *m2;
-   
+
   m1 = spool_test_malloc(pool, bytes + 1024);
   m2 = spool_test_malloc(pool, bytes);
   ASSERT_EQ(2, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
-  
+
   slot = calc_free_slot2(1, bytes + 1024);
   spool_free(pool, m1);
   ASSERT_EQ(2, all_queue_size(pool));
@@ -158,10 +158,10 @@ void test_pool_reused2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   for(i =0; i < SPOOL_SLOTS; i ++) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
-  
+
   ASSERT_EQ(m1, m1_1);
 
-  
+
   spool_free(pool, m1_1);
   spool_free(pool, m2);
   ASSERT_EQ(pool->start, pool->addr);
@@ -175,8 +175,8 @@ void test_pool_reused2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool_twice(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1, *m2;
-   
-  
+
+
   slot = calc_free_slot2(1, bytes);
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
@@ -194,7 +194,7 @@ void test_pool_twice(out_fn_t out_fn, spool_t *pool, size_t bytes) {
     }
   }
   spool_free(pool, m2);
-  
+
   ASSERT_EQ(pool->start, pool->addr);
   ASSERT_TRUE(TAILQ_EMPTY(&pool->all));
   for(i =0; i < SPOOL_SLOTS; i ++) {
@@ -214,7 +214,7 @@ void test_pool_twice(out_fn_t out_fn, spool_t *pool, size_t bytes) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
   spool_free(pool, m1);
-  
+
   ASSERT_EQ(pool->start, pool->addr);
   ASSERT_TRUE(TAILQ_EMPTY(&pool->all));
   for(i =0; i < SPOOL_SLOTS; i ++) {
@@ -225,8 +225,8 @@ void test_pool_twice(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1, *m2, *m3;
-   
-  
+
+
   slot = calc_free_slot2(1, bytes);
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
@@ -246,7 +246,7 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   }
 
   spool_free(pool, m2);
-  
+
   slot = calc_free_slot2(2, bytes);
   ASSERT_EQ(2, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
@@ -257,7 +257,7 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
     }
   }
   spool_free(pool, m3);
-  
+
   ASSERT_EQ(pool->start, pool->addr);
   ASSERT_TRUE(TAILQ_EMPTY(&pool->all));
   for(i =0; i < SPOOL_SLOTS; i ++) {
@@ -265,7 +265,7 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   }
 
 
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
   m3 = spool_test_malloc(pool, bytes);
@@ -276,12 +276,12 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   spool_free(pool, m3);
   ASSERT_EQ(2, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
-     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
+    ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
   spool_free(pool, m2);
   ASSERT_EQ(1, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
-      ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
+    ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
   spool_free(pool, m1);
   ASSERT_EQ(pool->start, pool->addr);
@@ -290,7 +290,7 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
 
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
   m3 = spool_test_malloc(pool, bytes);
@@ -298,7 +298,7 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   for(i =0; i < SPOOL_SLOTS; i ++) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
-  
+
   slot = calc_free_slot2(1, bytes);
   spool_free(pool, m2);
   ASSERT_EQ(3, all_queue_size(pool));
@@ -326,8 +326,8 @@ void test_pool3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool4(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1, *m2, *m3, *m4;
-   
-  
+
+
   slot = calc_free_slot2(1, bytes);
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
@@ -376,7 +376,7 @@ void test_pool4(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   }
 
 
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
   m3 = spool_test_malloc(pool, bytes);
@@ -388,17 +388,17 @@ void test_pool4(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   spool_free(pool, m4);
   ASSERT_EQ(3, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
-     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
+    ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
   spool_free(pool, m3);
   ASSERT_EQ(2, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
-     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
+    ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
   spool_free(pool, m2);
   ASSERT_EQ(1, all_queue_size(pool));
   for(i =0; i < SPOOL_SLOTS; i ++) {
-      ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
+    ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
   spool_free(pool, m1);
   ASSERT_EQ(pool->start, pool->addr);
@@ -407,7 +407,7 @@ void test_pool4(out_fn_t out_fn, spool_t *pool, size_t bytes) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
 
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
   m3 = spool_test_malloc(pool, bytes);
@@ -416,7 +416,7 @@ void test_pool4(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   for(i =0; i < SPOOL_SLOTS; i ++) {
     ASSERT_TRUE(TAILQ_EMPTY(&pool->free_slots[i]));
   }
-  
+
   slot = calc_free_slot2(1, bytes);
   spool_free(pool, m2);
   ASSERT_EQ(4, all_queue_size(pool));
@@ -461,8 +461,8 @@ void test_pool4(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool6(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot;
   void    *m1, *m2, *m3, *m4, *m5, *m6;
-   
-  
+
+
   slot = calc_free_slot2(1, bytes);
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
@@ -516,7 +516,7 @@ void test_pool6(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_pool6_2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i, slot1, slot2;
   void    *m1, *m2, *m3, *m4, *m5, *m6;
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_malloc(pool, bytes);
   m3 = spool_test_malloc(pool, bytes);
@@ -582,12 +582,12 @@ void test_pool6_2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_realloc(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i;
   void    *m1, *m2;
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_realloc(pool, m1, bytes+1);
-  
+
   ASSERT_EQ(m1, m2);
-  
+
   spool_free(pool, m2);
   ASSERT_EQ(pool->start, pool->addr);
   ASSERT_TRUE(TAILQ_EMPTY(&pool->all));
@@ -599,10 +599,10 @@ void test_realloc(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_realloc2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i;
   void    *m1, *m2;
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m2 = spool_test_realloc(pool, m1, bytes+1024);
-  
+
   ASSERT_EQ(m1, m2);
 
   spool_free(pool, m2);
@@ -615,11 +615,11 @@ void test_realloc2(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 void test_realloc3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   size_t  i;
   void    *m1, *m2, *m3;
-  
+
   m1 = spool_test_malloc(pool, bytes);
   m3 = spool_test_malloc(pool, bytes);
   m2 = spool_test_realloc(pool, m1, bytes+1024);
-  
+
   ASSERT_NE(m1, m2);
 
   spool_free(pool, m2);
@@ -633,110 +633,110 @@ void test_realloc3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
 
 
 
- TEST(pool, simple) {
-   size_t  i, bytes;
-   spool_t pool;
-   char    *mem;
-   
+TEST(pool, simple) {
+  size_t  i, bytes;
+  spool_t pool;
+  char    *mem;
+
 #define max_size6 (6 * 17 *1024)
-   mem = (char*)malloc(max_size6);
-   spool_init(&pool, mem, max_size6);
+  mem = (char*)malloc(max_size6);
+  spool_init(&pool, mem, max_size6);
 
-   for(i =0; i < SPOOL_SLOTS; i ++) {
-     bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
-     test_pool6(out_fn, &pool, bytes);
-   }
-   
-   for(i =0; i < SPOOL_SLOTS; i ++) {
-     bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
-     test_pool6_2(out_fn, &pool, bytes);
-   }
+  for(i =0; i < SPOOL_SLOTS; i ++) {
+    bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
+    test_pool6(out_fn, &pool, bytes);
+  }
 
-   free(mem);
+  for(i =0; i < SPOOL_SLOTS; i ++) {
+    bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
+    test_pool6_2(out_fn, &pool, bytes);
+  }
+
+  free(mem);
 
 
 #define max_size4 (4 * 17 *1024)
-   mem = (char*)malloc(max_size4);
-   spool_init(&pool, mem, max_size4);
+  mem = (char*)malloc(max_size4);
+  spool_init(&pool, mem, max_size4);
 
-   
-   bytes = (1 <<(2 + SPOOL_MIN_SHIFT))-1;
-   test_pool4(out_fn, &pool, bytes);
 
-   for(i =0; i < SPOOL_SLOTS; i ++) {
-     bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
-     test_pool4(out_fn, &pool, bytes);
-   }
+  bytes = (1 <<(2 + SPOOL_MIN_SHIFT))-1;
+  test_pool4(out_fn, &pool, bytes);
 
-   free(mem);
-   
+  for(i =0; i < SPOOL_SLOTS; i ++) {
+    bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
+    test_pool4(out_fn, &pool, bytes);
+  }
+
+  free(mem);
+
 #define max_size2 (3 * 17 *1024)
-   mem = (char*)malloc(max_size2);
-   spool_init(&pool, mem, max_size2);
-   for(i =0; i < SPOOL_SLOTS; i ++) {
-     bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
-     test_pool3(out_fn, &pool, bytes);
-     test_realloc3(out_fn, &pool, bytes);
-   }
+  mem = (char*)malloc(max_size2);
+  spool_init(&pool, mem, max_size2);
+  for(i =0; i < SPOOL_SLOTS; i ++) {
+    bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
+    test_pool3(out_fn, &pool, bytes);
+    test_realloc3(out_fn, &pool, bytes);
+  }
 
-   free(mem);
+  free(mem);
 
 #define max_size1 (2 * 17 *1024)
-   mem = (char*)malloc(max_size1);
-   spool_init(&pool, mem, max_size1);
-   
-   
-   test_pool_twice(out_fn, &pool, 9191);
-
-   for(i =0; i < SPOOL_SLOTS; i ++) {
-     bytes = (1 <<(i + SPOOL_MIN_SHIFT))-2;
-     test_pool_once(out_fn, &pool, bytes);
-     test_pool_reused(out_fn, &pool, bytes);
-     test_pool_reused2(out_fn, &pool, bytes);
-     test_realloc(out_fn, &pool, bytes);
-     test_realloc2(out_fn, &pool, bytes);
-   }
-
-   for(i =0; i < SPOOL_SLOTS; i ++) {
-     bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
-     test_pool_twice(out_fn, &pool, bytes);
-   }
-
-   free(mem);
-   
- }
+  mem = (char*)malloc(max_size1);
+  spool_init(&pool, mem, max_size1);
 
 
- static int cookie_error = 0;
- void on_cookie_error(void* cb) {
-   cookie_error ++;
- }
+  test_pool_twice(out_fn, &pool, 9191);
 
- 
- TEST(pool, cookie) {
-   size_t  i, bytes;
-   spool_t pool;
-   char    *mem;
-   void    *p;
-   
-#define max_size_cookie (1024)
-   mem = (char*)malloc(max_size_cookie);
-   spool_init(&pool, mem, max_size_cookie);
+  for(i =0; i < SPOOL_SLOTS; i ++) {
+    bytes = (1 <<(i + SPOOL_MIN_SHIFT))-2;
+    test_pool_once(out_fn, &pool, bytes);
+    test_pool_reused(out_fn, &pool, bytes);
+    test_pool_reused2(out_fn, &pool, bytes);
+    test_realloc(out_fn, &pool, bytes);
+    test_realloc2(out_fn, &pool, bytes);
+  }
 
-   cookie_error =0;
-   cookie_cb = &on_cookie_error;
+  for(i =0; i < SPOOL_SLOTS; i ++) {
+    bytes = (1 <<(i + SPOOL_MIN_SHIFT))-1;
+    test_pool_twice(out_fn, &pool, bytes);
+  }
 
-   p = spool_malloc(&pool, 8);
-   memset(p, 'a', 9);
-   spool_free(&pool, p);
+  free(mem);
 
-   ASSERT_EQ(1, cookie_error);
-   free(mem);
-   cookie_cb = nil;
 }
 
- 
- TEST(pool, transaction) {
+
+static int cookie_error = 0;
+void on_cookie_error(void* cb) {
+  cookie_error ++;
+}
+
+
+TEST(pool, cookie) {
+  size_t  i, bytes;
+  spool_t pool;
+  char    *mem;
+  void    *p;
+
+#define max_size_cookie (1024)
+  mem = (char*)malloc(max_size_cookie);
+  spool_init(&pool, mem, max_size_cookie);
+
+  cookie_error =0;
+  cookie_cb = &on_cookie_error;
+
+  p = spool_malloc(&pool, 8);
+  memset(p, 'a', 9);
+  spool_free(&pool, p);
+
+  ASSERT_EQ(1, cookie_error);
+  free(mem);
+  cookie_cb = nil;
+}
+
+
+TEST(pool, transaction) {
   size_t  i, bytes;
   spool_t pool;
   char    *mem;
@@ -744,15 +744,15 @@ void test_realloc3(out_fn_t out_fn, spool_t *pool, size_t bytes) {
   sbuf_t  buf;
   int     rc;
   void    *m1, *m2, *m3;
-   
-  #define max_size_transaction (1024)
+
+#define max_size_transaction (1024)
   mem = (char*)malloc(max_size_transaction);
   spool_init(&pool, mem, max_size_transaction);
 
   cookie_error =0;
   cookie_cb = &on_cookie_error;
 
-  
+
   p = spool_malloc(&pool, 2);
 
   rc = spool_prepare_alloc(&pool, &buf);

@@ -200,6 +200,7 @@
 
       'dependencies': [
         'squirrel',
+        'deps/http-parser/http_parser.gyp:http_parser',
       ],
       
       'include_dirs': [
@@ -210,6 +211,7 @@
         'test/array_test.cpp',
         'test/hashtable_test.cpp',
         'test/pool_test.cpp',
+        'test/http_test.cpp',
         'test/main.c',
       ],
     }, # hello_world sample

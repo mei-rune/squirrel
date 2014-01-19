@@ -21,9 +21,10 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status);
 
 
 DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
-  shttp_t *http = NULL;
+  shttp_t                     *http = NULL;
   shttp_connection_internal_t *conn = NULL;
-  size_t i = 0;
+  char                        *ptr;
+  size_t                      i = 0;
 
   if (0 == shttp_pagesize) {
     os_init();
@@ -96,43 +97,46 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
   TAILQ_INIT(&http->free_connections);
   TAILQ_INIT(&http->listenings);
 
+  memcpy(&http->settings.callbacks, &settings->callbacks, sizeof(shttp_callbacks_t));
   http->uv_loop = uv_loop_new();
 
 
   _shttp_parser_init(&http->parser_settings);
 
   for(i = 0; i < http->settings.max_connections_size; ++i) {
-    conn = (shttp_connection_internal_t*)sl_calloc(1,
-           shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                       http->settings.user_ctx_size, shttp_pagesize) +
-           (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count) +
-           http->settings.rw_buffer_size);
-
+    ptr = (char*)sl_calloc(1,
+                           shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+                           shttp_mem_align(http->settings.user_ctx_size) +
+                           (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count) +
+                           http->settings.rw_buffer_size);
+    conn = (shttp_connection_internal_t*)ptr;
     conn->inner.http = http;
     conn->inner.internal = conn;
     conn->inner.pool = &conn->pool;
-    conn->inner.ctx = ((char*)conn) + shttp_mem_align(sizeof(shttp_connection_internal_t));
+    conn->inner.ctx = ptr + shttp_mem_align(sizeof(shttp_connection_internal_t));
     conn->callbacks = &http->settings.callbacks;
-    
-    conn->incomming.headers.array = (shttp_kv_t*) ((char*)conn) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                          http->settings.user_ctx_size, shttp_pagesize);
+
+    conn->incomming.headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+                                    shttp_mem_align(http->settings.user_ctx_size));
     conn->incomming.headers.capacity = http->settings.max_headers_count;
     conn->incomming.headers.length = 0;
     conn->incomming.conn = conn;
 
-    
-    conn->outgoing.headers.array = (shttp_kv_t*) ((char*)conn) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                          http->settings.user_ctx_size, shttp_pagesize) +
-                          (sizeof(shttp_kv_t) * http->settings.max_headers_count);
+
+    conn->outgoing.headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+                                   shttp_mem_align(http->settings.user_ctx_size) +
+                                   (sizeof(shttp_kv_t) * http->settings.max_headers_count));
     conn->outgoing.headers.capacity = http->settings.max_headers_count;
-    conn->outgoing.write_buffers.capacity = 256;
-    conn->outgoing.write_buffers.length = 0;
-    conn->outgoing.call_after_writed.capacity = 2048;
+    conn->outgoing.head_write_buffers.capacity = 32;
+    conn->outgoing.head_write_buffers.length = 0;
+    conn->outgoing.body_write_buffers.capacity = 32;
+    conn->outgoing.body_write_buffers.length = 0;
+    conn->outgoing.call_after_writed.capacity = 32;
     conn->outgoing.call_after_writed.length = 0;
 
-    conn->arena_base = ((char*)conn) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                          http->settings.user_ctx_size, shttp_pagesize) +
-                          (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
+    conn->arena_base = ptr + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+                                         http->settings.user_ctx_size, shttp_pagesize) +
+                       (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
     conn->arena_capacity = http->settings.rw_buffer_size;
     conn->arena_offset = 0;
 
@@ -151,7 +155,7 @@ DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char 
 
 
   if(nil == network || 0 == strlen(network) ||
-    0 == strcasecmp("tcp", network) || 0 == strcasecmp("tcp4", network)) {
+      0 == strcasecmp("tcp", network) || 0 == strcasecmp("tcp4", network)) {
     rc = uv_ip4_addr(listen_addr, port, &address4);
     UV_CHECK(rc, http->uv_loop, "inet_pton");
     addr = (struct sockaddr *)&address4;
@@ -163,13 +167,14 @@ DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char 
     ERR("listen_at: '%s' is unknown.", network);
     return SHTTP_RES_ERROR;
   }
-  
+
   listening = (shttp_listening_t *)sl_calloc(1, sizeof(shttp_listening_t));
+  listening->http = http;
 
   rc = uv_tcp_init(http->uv_loop, &listening->uv_handle);
   UV_CHECK(rc, http->uv_loop, "init");
   listening->uv_handle.data = listening;
-  
+
   rc = uv_tcp_bind(&listening->uv_handle, addr);
   UV_CHECK(rc, http->uv_loop, "bind");
 

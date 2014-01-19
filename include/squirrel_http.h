@@ -13,6 +13,7 @@
 
 #include "squirrel_util.h"
 #include "squirrel_string.h"
+#include "squirrel_pool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -139,7 +140,7 @@ struct shttp_settings_s {
    * the user context size per connection, default is SHTTP_CTX_SIZE
    */
   size_t user_ctx_size;
-  
+
 #define SHTTP_MAX_HEADER_COUNT  256
   /**
    * max headers size, default is SHTTP_MAX_HEADER_COUNT
@@ -159,7 +160,7 @@ struct shttp_settings_s {
    */
   uint64_t max_body_size;
 
-#define SHTTP_RW_BUFFER_SIZE   2*1024*1024
+#define SHTTP_RW_BUFFER_SIZE   200*1024
   /**
    * the read buffer size per connection, default is SHTTP_RW_BUFFER_SIZE
    */
@@ -324,31 +325,31 @@ DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
  */
 /**@{*/
 DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
-                                            uint16_t status, 
-                                            const char *content_type,
-                                            size_t content_type_len);
+    uint16_t status,
+    const char *content_type,
+    size_t content_type_len);
 DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
 DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *conn,
-                                    const char *key,
-                                    size_t     key_len,
-                                    const char *value,
-                                    size_t     value_len);
+    const char *key,
+    size_t     key_len,
+    const char *value,
+    size_t     value_len);
 DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *conn,
-                                    const char *key,
-                                    size_t     key_len,
-                                    const char *fmt,
-                                    ...);
+    const char *key,
+    size_t     key_len,
+    const char *fmt,
+    ...);
 DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_connection_t *conn,
-                               const char *data,
-                               int length);
+    const char *data,
+    int length);
 DLL_VARIABLE shttp_res shttp_response_write_nocopy(shttp_connection_t *conn,
-                               const char *data,
-                               int length);
+    const char *data,
+    int length);
 DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
-                               const char *data,
-                               int length,
-                               shttp_write_cb cb,
-                               void *cb_data);
+    const char *data,
+    int length,
+    shttp_write_cb cb,
+    void *cb_data);
 DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
 /**@}*/
 

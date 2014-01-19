@@ -66,7 +66,7 @@ typedef struct shttp_incomming_s {
   cstring_t                          url;
   shttp_kv_array_t                   headers;
   struct shttp_connection_internal_s *conn;
-  
+
   shttp_message_status_t             status;
   int                                head_reading;
   struct http_parser                 parser;
@@ -81,18 +81,20 @@ typedef struct shttp_kv_buffer_s {
 typedef struct shttp_buffers_s {
   size_t      capacity;
   size_t      length;
-  uv_buf_t    array[256];
+  uv_buf_t    array[32];
 } shttp_buffers_t;
 
 typedef struct shttp_write_cb_buffer_s {
   size_t           capacity;
   size_t           length;
-  shttp_write_cb_t array[2048];
+  shttp_write_cb_t array[32];
 } shttp_write_cb_buffer_t;
 
 typedef struct shttp_outgoing_s {
   shttp_kv_buffer_t       headers;
-  shttp_buffers_t         write_buffers;
+  shttp_buffers_t         head_write_buffers;
+  shttp_buffers_t         body_write_buffers;
+  uv_write_t              write_req;
   shttp_write_cb_buffer_t call_after_writed;
   sstring_t               content_type;
   sbuffer_t               head_buffer;
@@ -131,6 +133,15 @@ struct shttp_s {
         ERR("%s: %s\n", msg, uv_strerror(r));     \
         return SHTTP_RES_UV;                      \
     }
+
+
+
+
+
+void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
+                                     void (*on_disconnect)(uv_handle_t* handle),
+                                     void (*on_head_writed)(uv_write_t* req, int status),
+                                     void (*on_writed)(uv_write_t* req, int status));
 
 #ifdef __cplusplus
 }

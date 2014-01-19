@@ -4,24 +4,20 @@
 #include "squirrel_test.h"
 
 
-typedef struct intArray_s
-{
-	ARRAY_DECLARE(int);
+typedef struct intArray_s {
+  ARRAY_DECLARE(int);
 } intArray_t;
 
 
-void int_init(int* begin, int* end)
-{
+void int_init(int* begin, int* end) {
   memset(begin, 0, (char*)end - (char*)begin);
 }
 
-void int_free(int val)
-{  
+void int_free(int val) {
 }
-  
 
-TEST(ARRAY, func)
-{
+
+TEST(ARRAY, func) {
   intArray_t ar;
 
   ARRAY_INIT(int, &ar, 2);

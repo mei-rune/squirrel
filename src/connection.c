@@ -15,6 +15,9 @@ extern "C" {
 /*****************************************************************************
  * HTTP Server Callback Functions
  ****************************************************************************/
+  
+static void _shttp_on_writed(uv_write_t* req, int status);
+
 
 static void _shttp_on_null_disconnect(uv_handle_t* server_handle) {
   sl_free(server_handle);
@@ -47,18 +50,13 @@ end:
   sl_free(handle);
 }
 
-int _shttp_connection_on_message_begin(shttp_connection_internal_t* conn) {
-  return conn->callbacks->on_message_begin(&conn->inner);
-}
 
-int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at, size_t length) {
-  return conn->callbacks->on_body(&conn->inner, at, length);
-}
-
-int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
-  spool_init(&conn->pool, ((char*)conn->arena_base) + conn->arena_offset, conn->arena_capacity - conn->arena_offset);
-  return conn->callbacks->on_message_complete(&conn->inner);
-}
+#define call_hooks_after_writed(inner_conn)                                \
+  for(i = 0; i < inner_conn->outgoing.call_after_writed.length; i ++) {    \
+    inner_conn->outgoing.call_after_writed.array[0].cb(&inner_conn->inner, \
+      inner_conn->outgoing.call_after_writed.array[0].data);               \
+  }                                                                        \
+  inner_conn->outgoing.call_after_writed.length = 0
 
 static void _shttp_on_disconnect(uv_handle_t* handle) {
   shttp_connection_internal_t *inner;
@@ -68,6 +66,63 @@ static void _shttp_on_disconnect(uv_handle_t* handle) {
 
   TAILQ_REMOVE(&http->connections, inner, next);
   TAILQ_INSERT_TAIL(&http->free_connections, inner, next);
+}
+
+static void _shttp_on_head_writed(uv_write_t* req, int status) {
+  shttp_connection_internal_t *inner;
+  
+  inner = (shttp_connection_internal_t*)req->data;
+  if (status < 0) {
+    ERR("write: %s", uv_strerror(status));
+    uv_close((uv_handle_t*) &inner->uv_handle, &_shttp_on_disconnect);
+    return;
+  }
+  inner->outgoing.head_write_buffers.length = 0;
+  _shttp_response_send_ready_data(inner,
+    &_shttp_on_disconnect,
+    &_shttp_on_head_writed,
+    &_shttp_on_writed);
+}
+
+static void _shttp_on_writed(uv_write_t* req, int status) {
+  shttp_connection_internal_t *inner;
+  int                         i;
+  
+  inner = (shttp_connection_internal_t*)req->data;
+  if (status < 0) {
+    ERR("write: %s", uv_strerror(status));
+    uv_close((uv_handle_t*) &inner->uv_handle, &_shttp_on_disconnect);
+    return;
+  }
+  
+  inner->outgoing.body_write_buffers.length = 0;
+  call_hooks_after_writed(inner);
+}
+
+int _shttp_connection_on_message_begin(shttp_connection_internal_t* conn) {
+  return conn->callbacks->on_message_begin(&conn->inner);
+}
+
+int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at, size_t length) {
+  return conn->callbacks->on_body(&conn->inner, at, length);
+}
+
+int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
+  int   res, i;
+  spool_init(&conn->pool, ((char*)conn->arena_base) + conn->arena_offset,
+    conn->arena_capacity - conn->arena_offset);
+  res = conn->callbacks->on_message_complete(&conn->inner);
+  if(0 != res) {
+    ERR("callback: result of callback is %d.", res);
+    call_hooks_after_writed(conn);
+    uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_on_disconnect);
+    return 0;
+  }
+  _shttp_response_send_ready_data(conn,
+    &_shttp_on_disconnect, 
+    &_shttp_on_head_writed, 
+    &_shttp_on_writed);
+  return 0;
 }
 
 static void _shttp_on_connection_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf) {
@@ -83,7 +138,7 @@ static void _shttp_on_connection_alloc(uv_handle_t* req, size_t suggested_size, 
     return;
   }
   buf->base = ((char*)inner->arena_base) + offset;
-  buf->len = inner->arena_capacity - offset;
+  buf->len = (unsigned long)(inner->arena_capacity - offset);
 }
 
 static void _shttp_on_connection_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf) {
@@ -94,7 +149,7 @@ static void _shttp_on_connection_read(uv_stream_t* tcp, ssize_t nread, const uv_
   if (nread <= 0) {
     // No Data Read... Handle Error case
     if (0 != nread && UV_EOF != nread) {
-      ERR("read: %s", uv_strerror(nread));
+      ERR("read: %s", uv_strerror((int)nread));
     } else {
       TRACE("read: close.");
     }
@@ -145,35 +200,39 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status) {
   uv_tcp_init(http->uv_loop, &inner->uv_handle);
   inner->uv_handle.data = inner;
 
-  
+
   memset(&inner->inner.request, 0, sizeof(shttp_request_t));
   memset(&inner->inner.response, 0, sizeof(shttp_response_t));
   assert(inner->inner.http == http);
   assert(inner->inner.internal == inner);
   assert(inner->inner.pool == &inner->pool);
-  assert(((char*)inner->incomming.headers.array) == (((char*)inner) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                          http->settings.user_ctx_size, shttp_pagesize)));
+
+  assert(((char*)(inner->incomming.headers.array)) ==(((char*)inner) + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+         shttp_mem_align(http->settings.user_ctx_size)));
   assert(inner->incomming.headers.capacity == http->settings.max_headers_count);
   assert(inner->callbacks == &inner->inner.http->settings.callbacks);
   assert(inner->incomming.conn == inner->inner.internal);
 
-  
+
   inner->incomming.headers.length = 0;
   inner->incomming.headers_bytes_count = 0;
   inner->incomming.status = shttp_message_begin;
   http_parser_init(&inner->incomming.parser, HTTP_REQUEST);
   inner->incomming.parser.data = &inner->incomming;
-  
-  assert(((char*)inner->outgoing.headers.array) == (((char*)inner) + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                          http->settings.user_ctx_size, shttp_pagesize) +
-                          (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
+
+  assert(((char*)inner->outgoing.headers.array) == (((char*)inner) + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+         shttp_mem_align(http->settings.user_ctx_size) +
+         (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
   assert(inner->outgoing.headers.capacity == http->settings.max_headers_count);
-  assert(inner->outgoing.write_buffers.capacity == 256);
-  assert(inner->outgoing.call_after_writed.capacity == 2048);
+  assert(inner->outgoing.head_write_buffers.capacity == 32);
+  assert(inner->outgoing.body_write_buffers.capacity == 32);
+  assert(inner->outgoing.call_after_writed.capacity == 32);
   assert(inner->outgoing.content_type.len == 0);
   assert(inner->outgoing.content_type.str == nil);
-
-  inner->outgoing.write_buffers.length = 0;
+  
+  inner->outgoing.write_req.data = inner;
+  inner->outgoing.head_write_buffers.length = 0;
+  inner->outgoing.body_write_buffers.length = 0;
   inner->outgoing.call_after_writed.length = 0;
   inner->inner.response.headers.array = inner->outgoing.headers.array;
   inner->inner.response.headers.length = 0;
@@ -182,7 +241,7 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status) {
   inner->inner.response.status_code = SHTTP_STATUS_OK;
   inner->inner.response.chunked = SHTTP_THUNKED_NONE;
   inner->inner.response.close_connection = SHTTP_CLOSE_CONNECTION_NONE;
-  
+
   rc = uv_accept(server_handle, (uv_stream_t*)&inner->uv_handle);
   if(rc) {
     ERR("accept: %s\n", uv_strerror(rc));

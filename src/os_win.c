@@ -81,6 +81,8 @@ void os_init() {
   for (n = shttp_pagesize; n >>= 1; shttp_pagesize_shift++) {
     /* void */
   }
+
+  _shttp_status_init();
 }
 
 #ifdef _WIN32

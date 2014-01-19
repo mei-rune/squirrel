@@ -30,8 +30,8 @@ void on_message_send (void *act) {
 
   switch(ctx->status) {
   case 0:
-    shttp_response_start(conn, 200, &HTTP_CONTENT_TEXT_HTML);
-    shttp_response_set_header(conn, "abc", 3, "abc", 3, SHTTP_HEAD_COPY);
+    shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+    shttp_response_write_header(conn, "abc", 3, "abc", 3);
     shttp_response_write(conn, "abc", 3, &on_message_send, act);
   case 1:
     shttp_response_write(conn, "abc", 3, &on_message_send, act);
@@ -56,7 +56,11 @@ int main(int argc, char** argv) {
   memset(&settings, 0, sizeof(shttp_settings_t));
   settings.user_ctx_size = sizeof(usr_context_t);
   shttp_set_log_callback(&on_log);
-  srv = shttp_create(nil);
+
+  settings.callbacks.on_message_begin = &on_message_begin;
+  settings.callbacks.on_body = &on_body;
+  settings.callbacks.on_message_complete = &on_message_complete;
+  srv = shttp_create(&settings);
   if(nil == srv) {
     return -1;
   }
