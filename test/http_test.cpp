@@ -221,7 +221,7 @@ const char * raw= "GET /favicon.ico HTTP/1.1\r\n"
 
 #define HELLO_WORLD "<html><body>HELLO WORLD!!!</body></html>"
 
-const char *HELLO_WORLD_RESPONSE = "HTTP/0.0 200 200 OK\r\nabc: abc\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nContent-Length: 40\r\n\r\n<html><body>HELLO WORLD!!!</body></html>";
+const char *HELLO_WORLD_RESPONSE = "HTTP/0.0 200 OK\r\nabc: abc\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nContent-Length: 40\r\n\r\n<html><body>HELLO WORLD!!!</body></html>";
 
 static cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
 
@@ -314,4 +314,21 @@ TEST(http, simple) {
   rc = shttp_shutdown(srv);
   ASSERT_EQ(SHTTP_RES_OK, rc);
   uv_thread_join(&tid);
+  shttp_free(srv);
+}
+
+
+TEST(http, create_and_free) {
+  shttp_settings_t settings;
+  shttp_t          *srv;
+
+  memset(&settings, 0, sizeof(shttp_settings_t));
+  settings.user_ctx_size = sizeof(usr_context_t);
+  shttp_set_log_callback(&on_log);
+  settings.callbacks.on_message_begin = &on_message_begin;
+  settings.callbacks.on_body = &on_body;
+  settings.callbacks.on_message_complete = &on_message_complete;
+  srv = shttp_create(&settings);
+  ASSERT_NE(nil, srv);
+  shttp_free(srv);
 }

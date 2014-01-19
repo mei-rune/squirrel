@@ -319,6 +319,7 @@ DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char *listen_addr, short port);
 DLL_VARIABLE shttp_res shttp_run(shttp_t *server);
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
+DLL_VARIABLE void shttp_free(shttp_t *server);
 /**@}*/
 
 /** @name http response methods

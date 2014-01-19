@@ -162,7 +162,6 @@ block_lookup_end:
 static inline void *_spool_try_realloc(spool_t *pool, spool_block_t *block, char* p, size_t size) {
   size_t           s, new_capacity, slot;
   spool_block_t    *next;
-  void             *new_ptr;
 
   next = TAILQ_NEXT(block, all_next);
   if(nil == next) {
@@ -195,8 +194,7 @@ static inline void *_spool_try_realloc(spool_t *pool, spool_block_t *block, char
 }
 
 DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size) {
-  size_t           s, new_capacity, slot;
-  spool_block_t    *block, *next;
+  spool_block_t    *block;
   void             *new_ptr;
 
   block = PTR_TO_BLOCK(p);
@@ -216,8 +214,7 @@ DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size) {
 }
 
 DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size) {
-  size_t           s, new_capacity, slot;
-  spool_block_t    *block, *next;
+  spool_block_t    *block;
   void             *new_ptr;
 
   block = PTR_TO_BLOCK(p);

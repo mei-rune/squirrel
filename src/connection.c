@@ -150,8 +150,6 @@ static void _shttp_on_connection_read(uv_stream_t* tcp, ssize_t nread, const uv_
     // No Data Read... Handle Error case
     if (0 != nread && UV_EOF != nread) {
       ERR("read: %s", uv_strerror((int)nread));
-    } else {
-      TRACE("read: close.");
     }
     uv_close((uv_handle_t*) &inner->uv_handle, &_shttp_on_disconnect);
     return;

@@ -142,8 +142,23 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
 
     TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
   }
-
+  
   return (http);
+}
+
+DLL_VARIABLE void shttp_free(shttp_t *http) {
+  shttp_connection_internal_t *conn;
+
+  assert(TAILQ_EMPTY(&http->listenings));
+  assert(TAILQ_EMPTY(&http->connections));
+  while(!TAILQ_EMPTY(&http->free_connections)) {
+    conn = TAILQ_FIRST(&http->free_connections);
+    TAILQ_REMOVE(&http->free_connections, conn, next);
+    sl_free(conn);
+  }
+
+  uv_loop_delete(http->uv_loop);
+  sl_free(http);
 }
 
 DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char *listen_addr, short port) {
@@ -183,21 +198,6 @@ DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char 
 
   TAILQ_INSERT_TAIL(&http->listenings, listening, next);
   return SHTTP_RES_OK;
-}
-
-static void _shttp_free(shttp_t *http) {
-  shttp_connection_internal_t *conn;
-  //shttp_listening_t  *listening;
-
-  assert(TAILQ_EMPTY(&http->listenings));
-  assert(TAILQ_EMPTY(&http->connections));
-
-  TAILQ_FOREACH(conn, &http->free_connections, next) {
-    sl_free(conn);
-  }
-
-  uv_loop_delete(http->uv_loop);
-  sl_free(http);
 }
 
 DLL_VARIABLE shttp_res shttp_run(shttp_t *http) {
