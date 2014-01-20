@@ -55,6 +55,10 @@ typedef enum shttp_message_status_e {
   shttp_message_end     = 6
 } shttp_message_status_t;
 
+#define shttp_write_buffers_size    32
+#define shttp_head_write_buffers_size shttp_write_buffers_size
+#define shttp_body_write_buffers_size shttp_write_buffers_size
+#define shttp_write_cb_buffers_size (2*shttp_write_buffers_size)
 
 typedef struct shttp_kv_array_s {
   size_t      capacity;
@@ -81,13 +85,13 @@ typedef struct shttp_kv_buffer_s {
 typedef struct shttp_buffers_s {
   size_t      capacity;
   size_t      length;
-  uv_buf_t    array[32];
+  uv_buf_t    array[shttp_write_buffers_size];
 } shttp_buffers_t;
 
 typedef struct shttp_write_cb_buffer_s {
   size_t           capacity;
   size_t           length;
-  shttp_write_cb_t array[32];
+  shttp_write_cb_t array[shttp_write_cb_buffers_size];
 } shttp_write_cb_buffer_t;
 
 typedef struct shttp_outgoing_s {
@@ -98,6 +102,10 @@ typedef struct shttp_outgoing_s {
   shttp_write_cb_buffer_t call_after_writed;
   sstring_t               content_type;
   sbuffer_t               head_buffer;
+  
+  shttp_res               failed_code;
+  uint64_t                is_body_end:1;
+  uint64_t                reserved:63;
 } shttp_outgoing_t;
 
 typedef struct shttp_connection_internal_s {
@@ -136,12 +144,55 @@ struct shttp_s {
 
 
 
+static inline void _shttp_response_call_hooks_after_writed(shttp_connection_internal_t *conn,
+                                                           shttp_outgoing_t *outgoing) {
+  int                     i;
+  shttp_write_cb_buffer_t cb_buf;
 
+  memcpy(&cb_buf.array[0],  &outgoing->call_after_writed.array[0], 
+    sizeof(shttp_write_cb_t)*outgoing->call_after_writed.length);
+  cb_buf.length = outgoing->call_after_writed.length;
+
+  outgoing->call_after_writed.length = 0;
+  for(i = 0; i < cb_buf.length; i ++) {
+    cb_buf.array[i].cb(&conn->inner, cb_buf.array[i].data);
+  }
+}
 
 void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
-                                     void (*on_disconnect)(uv_handle_t* handle),
-                                     void (*on_head_writed)(uv_write_t* req, int status),
-                                     void (*on_writed)(uv_write_t* req, int status));
+                                     uv_close_cb on_disconnect,
+                                     uv_write_cb on_head_writed,
+                                     uv_write_cb on_writed);
+void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
+                                        uv_close_cb on_disconnect,
+                                         const char* message_str,
+                                         size_t message_len);
+void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn,
+                                        uv_close_cb on_disconnect,
+                                        const char  *fmt,
+                                        ...);
+
+
+
+
+#define shttp_strerr(num) num
+
+
+#define INTERNAL_ERROR_HEADERS   "HTTP/0.0 500 Internal Server Error\r\n"    \
+                                 "Connection: close\r\n"                     \
+                                 "Content-Type: text/plain\r\n"              \
+                                 "\r\n"
+
+
+#define BODY_NOT_COMPLETE        INTERNAL_ERROR_HEADERS                      \
+                                 "Internal Server Error:\r\n"                \
+                                 "\tBODY_NOT_COMPLETE"
+
+
+#define INTERNAL_ERROR_FROMAT    INTERNAL_ERROR_HEADERS                      \
+                                 "Internal Server Error:\r\n"                \
+                                 "\t%d"
+
 
 #ifdef __cplusplus
 }

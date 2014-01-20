@@ -214,6 +214,7 @@ DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
   if(1 == inner->inner.response.head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
+  assert(0 == inner->outgoing.is_body_end);
 
   inner->inner.response.status_code = status;
   copy_content_type(content_type, content_type_len);
@@ -226,6 +227,7 @@ DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn) {
   if(1 == inner->inner.response.head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
+  assert(0 == inner->outgoing.is_body_end);
   conn->response.chunked = 1;
   return SHTTP_RES_OK;
 }
@@ -243,8 +245,8 @@ DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data
   spool_free(&inner->pool, data);
 }
 
-static void _shttp_c_free (shttp_connection_t *conn, void *data) {
-  free(data);
+DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data) {
+  sl_free(data);
 }
 
 
@@ -392,9 +394,13 @@ DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *conn,
 
   inner = (shttp_connection_internal_t*)conn->internal;
 
+  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+    return SHTTP_RES_RESPONSE_ALREADY_FAILED;
+  }
   if(1 == inner->inner.response.head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
+  assert(0 == inner->outgoing.is_body_end);
 
   do_predefine_headers(key, key_len, value, value_len);
 
@@ -441,10 +447,14 @@ DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *co
   shttp_res                            rc;
 
   inner = (shttp_connection_internal_t*)conn->internal;
-
+  
+  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+    return SHTTP_RES_RESPONSE_ALREADY_FAILED;
+  }
   if(1 == inner->inner.response.head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
+  assert(0 == inner->outgoing.is_body_end);
 
   if(conn->request.headers.length >= inner->outgoing.headers.capacity) {
     return SHTTP_RES_HEAD_TOO_LARGE;
@@ -632,6 +642,10 @@ DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
   inner = (shttp_connection_internal_t*)conn->internal;
 
   inner->inner.response.content_length += length;
+  
+  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+    return SHTTP_RES_RESPONSE_ALREADY_FAILED;
+  }
 
   WRITE_TO_UV_BUF(inner, body_write_buffers, (char*)data, length);
   if(nil != cb) {
@@ -644,39 +658,70 @@ DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn) {
   shttp_res                            rc;
   shttp_connection_internal_t          *inner;
   inner = (shttp_connection_internal_t*)conn->internal;
+  
+  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+    return SHTTP_RES_RESPONSE_ALREADY_FAILED;
+  }
+  if(1 != inner->inner.response.head_writed) {
+    assert(0 == inner->outgoing.is_body_end);
+    rc = _shttp_response_send_predefine_headers(inner, &inner->inner);
+    if(SHTTP_RES_OK != rc) {
+      ERR("callback: write predefine header failed.");
+      inner->outgoing.failed_code = rc;
+      return rc;
+    }
+    inner->inner.response.head_writed = 1;
+  }
 
+  
+  if(nil != inner->outgoing.content_type.str) {
+    spool_free(&inner->pool, inner->outgoing.content_type.str);
+    inner->outgoing.content_type.len = 0;
+    inner->outgoing.content_type.str = nil;
+  }
+
+
+  assert(0 == inner->outgoing.is_body_end);
+  inner->outgoing.is_body_end = 1;
   return SHTTP_RES_OK;
 }
 
 
-
-
-static inline void _shttp_response_call_hooks_after_writed(shttp_connection_internal_t *conn,
-                                                           shttp_outgoing_t *outgoing) {
-  int i;
-
-  for(i = 0; i < outgoing->call_after_writed.length; i ++) {
-    outgoing->call_after_writed.array[0].cb(&conn->inner,
-      outgoing->call_after_writed.array[0].data);
-  }
-  outgoing->call_after_writed.length = 0;
-}
-
-
-
-
 void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
-                                                 void (*on_disconnect)(uv_handle_t* handle),
-                                                 void (*on_head_writed)(uv_write_t* req, int status),
-                                                 void (*on_writed)(uv_write_t* req, int status)) {
+                                     uv_close_cb on_disconnect,
+                                     uv_write_cb on_head_writed,
+                                     uv_write_cb on_writed) {
   int rc;
+  
+  if(SHTTP_RES_OK != conn->outgoing.failed_code) {
+
+    conn->outgoing.head_write_buffers.length = 0;
+    conn->outgoing.body_write_buffers.length = 0;
+    _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
+    _shttp_response_send_error_message_format(conn, on_disconnect, 
+      INTERNAL_ERROR_FROMAT, shttp_strerr(conn->outgoing.failed_code));
+    return;
+  }
+
+  if(0 == conn->outgoing.is_body_end &&
+    0 == conn->inner.response.chunked) {
+    conn->outgoing.failed_code = SHTTP_RES_BODY_NOT_COMPLETE;
+    ERR("callback: chunked must is true while body is not completed.");    
+    
+    conn->outgoing.head_write_buffers.length = 0;
+    conn->outgoing.body_write_buffers.length = 0;
+    _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
+    _shttp_response_send_error_message(conn, on_disconnect, 
+      BODY_NOT_COMPLETE, strlen(BODY_NOT_COMPLETE));
+    return;
+  }
+
   if(1 != conn->inner.response.head_writed) {
+    assert(0 == conn->outgoing.is_body_end);
     rc = _shttp_response_send_predefine_headers(conn, &conn->inner);
     if(SHTTP_RES_OK != rc) {
       ERR("callback: write predefine header failed.");
-      _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
-      uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
-      return;
+      goto failed;
     }
     conn->inner.response.head_writed = 1;
   }
@@ -684,23 +729,31 @@ void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
   if(0 == conn->outgoing.head_write_buffers.length) {
     if(0 == conn->outgoing.body_write_buffers.length) {
       ERR("callback: write buffers is empty.");
-      _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
-      uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
-      return;
+      goto failed;
     }
     
-    uv_write(&conn->outgoing.write_req,
+    rc = uv_write(&conn->outgoing.write_req,
       (uv_stream_t*)&conn->uv_handle,
       &conn->outgoing.body_write_buffers.array[0],
       (unsigned long)conn->outgoing.body_write_buffers.length,
       on_writed);
   } else {
-    uv_write(&conn->outgoing.write_req,
+    rc = uv_write(&conn->outgoing.write_req,
       (uv_stream_t*)&conn->uv_handle,
       &conn->outgoing.head_write_buffers.array[0],
       (unsigned long)conn->outgoing.head_write_buffers.length,
       on_head_writed);
   }
+  if(0 == rc) {
+    return;
+  }
+  ERR("write: %s", uv_strerror(rc));
+failed:  
+  conn->outgoing.head_write_buffers.length = 0;
+  conn->outgoing.body_write_buffers.length = 0;
+  _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
+  uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
+  return;
 }
 
 #ifdef __cplusplus

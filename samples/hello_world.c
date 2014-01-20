@@ -7,7 +7,6 @@
 static cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
 
 typedef struct usr_context_s {
-  shttp_connection_t* conn;
   int                 status;
 } usr_context_t;
 
@@ -24,9 +23,10 @@ int  on_body (shttp_connection_t* conn, const char *at, size_t length) {
   return 0;
 }
 
-void on_message_send (void *act) {
-  usr_context_t *ctx = (usr_context_t*)act;
-  shttp_connection_t* conn = ctx->conn;
+void on_message_send (shttp_connection_t* conn, void *act) {
+  usr_context_t       *ctx;
+
+  ctx = (usr_context_t*)act;
 
   switch(ctx->status) {
   case 0:
@@ -43,8 +43,7 @@ void on_message_send (void *act) {
 int  on_message_complete (shttp_connection_t* conn) {
   usr_context_t *ctx = (usr_context_t*)conn->ctx;
   ctx->status = 0;
-  ctx->conn = conn;
-  on_message_send(ctx);
+  on_message_send(conn, ctx);
   return 0;
 }
 

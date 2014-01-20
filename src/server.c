@@ -127,11 +127,11 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
                                    shttp_mem_align(http->settings.user_ctx_size) +
                                    (sizeof(shttp_kv_t) * http->settings.max_headers_count));
     conn->outgoing.headers.capacity = http->settings.max_headers_count;
-    conn->outgoing.head_write_buffers.capacity = 32;
+    conn->outgoing.head_write_buffers.capacity = shttp_head_write_buffers_size;
     conn->outgoing.head_write_buffers.length = 0;
-    conn->outgoing.body_write_buffers.capacity = 32;
+    conn->outgoing.body_write_buffers.capacity = shttp_body_write_buffers_size;
     conn->outgoing.body_write_buffers.length = 0;
-    conn->outgoing.call_after_writed.capacity = 32;
+    conn->outgoing.call_after_writed.capacity = shttp_write_cb_buffers_size;
     conn->outgoing.call_after_writed.length = 0;
 
     conn->arena_base = ptr + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
@@ -218,13 +218,39 @@ static void _shttp_on_listening_close(uv_handle_t* handle) {
   sl_free(listening);
 }
 
-DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *http) {
-  shttp_listening_t* listening;
+static void _shttp_close_shutdown_request(uv_handle_t* handle) {
+  sl_free((uv_async_t*)handle);
+}
 
+static void _shttp_shutdown(uv_async_t* handle, int status) {
+  shttp_listening_t  *listening;
+  shttp_t            *http;
+
+  http = (shttp_t*)handle->data;
   TAILQ_FOREACH(listening, &http->listenings, next) {
     uv_close((uv_handle_t *)&listening->uv_handle, &_shttp_on_listening_close);
   }
-  return SHTTP_RES_OK;
+  uv_close((uv_handle_t *)handle, &_shttp_close_shutdown_request);
+}
+
+DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *http) {
+  uv_async_t *async;
+  int        rc;
+
+  async = (uv_async_t*)sl_malloc(sizeof(uv_async_t));
+  rc = uv_async_init(http->uv_loop, async, &_shttp_shutdown);
+  if(0 != rc) {
+    ERR("shttp_shutdown: %s", uv_strerror(rc));
+    sl_free(async);
+    return SHTTP_RES_UV;
+  }
+  async->data = http;
+  rc = uv_async_send(async);
+  if(0 != rc) {
+    ERR("shttp_shutdown: %s", uv_strerror(rc));
+    sl_free(async);
+    return SHTTP_RES_UV;
+  }
 }
 
 #ifdef __cplusplus

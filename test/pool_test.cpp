@@ -8,11 +8,13 @@ void *spool_test_realloc(spool_t *pool, void* p, size_t size) {
   memset(c, '4', size);
   return c;
 }
+
 void *spool_test_malloc(spool_t *pool, size_t size) {
   void *p = spool_malloc(pool, size);
   memset(p, '4', size);
   return p;
 }
+
 size_t calc_free_slot(size_t size) {
   // 8 16 32 64 128 256 512 1024 2048 4096  8192 other
   // 0  1  2  3   4   5   6    7    8    9    10    11

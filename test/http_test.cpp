@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "uv.h"
 //#include "http_parser.h"
+#include "internal.h"
 #include "squirrel_test.h"
 #include "squirrel_http.h"
 
@@ -226,9 +227,21 @@ const char *HELLO_WORLD_RESPONSE = "HTTP/0.0 200 OK\r\nabc: abc\r\nConnection: k
 static cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
 
 typedef struct usr_context_s {
-  shttp_connection_t* conn;
   int                 status;
+  void                *data1;
+  void                *data2;
 } usr_context_t;
+
+
+void on_write_frist(shttp_connection_t* conn, void* act) {
+  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  ctx->data1 = act;
+}
+
+void on_write_second(shttp_connection_t* conn, void* act) {
+  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  ctx->data2 = act;
+}
 
 void on_log(int severity, const char *fmt, va_list ap) {
   vprintf(fmt, ap);
@@ -246,14 +259,27 @@ int  on_body (shttp_connection_t* conn, const char *at, size_t length) {
 int  on_message_complete (shttp_connection_t* conn) {
   usr_context_t *ctx = (usr_context_t*)conn->ctx;
   ctx->status = 0;
-  ctx->conn = conn;
-
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_write_header(conn, "abc", 3, "abc", 3);
-  shttp_response_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), nil, nil);
+  shttp_response_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
   shttp_response_end(conn);
   return 0;
 }
+
+
+
+int  on_message_complete_muti_write(shttp_connection_t* conn) {
+  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  ctx->status = 0;
+
+  shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_write_header(conn, "abc", 3, "abc", 3);
+  shttp_response_write(conn, HELLO_WORLD, strlen(HELLO_WORLD) -3, on_write_frist,  nil);
+  shttp_response_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
+  shttp_response_end(conn);
+  return 0;
+}
+
 
 void start_web(void *arg) {
   shttp_res  rc;
@@ -308,7 +334,83 @@ TEST(http, simple) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
   s = max_recv(sock, buf, 2048, 2);
-  ASSERT_TRUE( 0 == strncmp(buf, HELLO_WORLD_RESPONSE, s));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+  
+  rc = shttp_shutdown(srv);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_join(&tid);
+  shttp_free(srv);
+}
+
+TEST(http, reuse_connect) {
+  shttp_settings_t settings;
+  shttp_t          *srv;
+  shttp_res        rc;
+  uv_thread_t      tid;
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  memset(&settings, 0, sizeof(shttp_settings_t));
+  settings.user_ctx_size = sizeof(usr_context_t);
+  shttp_set_log_callback(&on_log);
+
+  settings.callbacks.on_message_begin = &on_message_begin;
+  settings.callbacks.on_body = &on_body;
+  settings.callbacks.on_message_complete = &on_message_complete;
+  srv = shttp_create(&settings);
+  ASSERT_NE(nil, srv);
+  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_create(&tid, &start_web, srv);
+
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+
+
+  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  s = max_recv(sock, buf, 2048, 1);
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+
+  
+  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  s = max_recv(sock, buf, 2048, 1);
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+
+  closesocket(sock);
+  
+  rc = shttp_shutdown(srv);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_join(&tid);
+  shttp_free(srv);
+}
+
+TEST(http, muti_write) {
+  shttp_settings_t settings;
+  shttp_t          *srv;
+  shttp_res        rc;
+  uv_thread_t      tid;
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  memset(&settings, 0, sizeof(shttp_settings_t));
+  settings.user_ctx_size = sizeof(usr_context_t);
+  shttp_set_log_callback(&on_log);
+
+  settings.callbacks.on_message_begin = &on_message_begin;
+  settings.callbacks.on_body = &on_body;
+  settings.callbacks.on_message_complete = &on_message_complete_muti_write;
+  srv = shttp_create(&settings);
+  ASSERT_NE(nil, srv);
+  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_create(&tid, &start_web, srv);
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  s = max_recv(sock, buf, 2048, 2);
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
   closesocket(sock);
   
   rc = shttp_shutdown(srv);
@@ -333,6 +435,67 @@ TEST(http, create_and_free) {
   ASSERT_EQ(SHTTP_RES_OK, shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT));
   uv_thread_create(&tid, &start_web, srv);
   ASSERT_EQ(SHTTP_RES_OK, shttp_shutdown(srv));
+  uv_thread_join(&tid);
+  shttp_free(srv);
+}
+
+
+
+void on_message_send (shttp_connection_t* conn, void *act) {
+  usr_context_t *ctx = (usr_context_t*)act;
+
+  switch(ctx->status) {
+  case 0:
+    shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+    shttp_response_write_header(conn, "abc", 3, "abc", 3);
+    shttp_response_write(conn, "abc", 3, &on_message_send, act);
+    break;
+  case 1:
+    shttp_response_write(conn, "abc", 3, &on_message_send, act);
+    break;
+  case 2:
+    shttp_response_end(conn);
+    break;
+  }
+}
+
+int on_message_complete_not_thunked(shttp_connection_t* conn) {
+  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  ctx->status = 0;
+  on_message_send(conn, ctx);
+  return 0;
+}
+
+
+TEST(http, end_not_call_with_not_thunked) {
+  shttp_settings_t settings;
+  shttp_t          *srv;
+  shttp_res        rc;
+  uv_thread_t      tid;
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  memset(&settings, 0, sizeof(shttp_settings_t));
+  settings.user_ctx_size = sizeof(usr_context_t);
+  shttp_set_log_callback(&on_log);
+
+  settings.callbacks.on_message_begin = &on_message_begin;
+  settings.callbacks.on_body = &on_body;
+  settings.callbacks.on_message_complete = &on_message_complete_not_thunked;
+  srv = shttp_create(&settings);
+  ASSERT_NE(nil, srv);
+  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_create(&tid, &start_web, srv);
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  s = max_recv(sock, buf, 2048, 2);
+  ASSERT_EQ(0, strcmp(buf, BODY_NOT_COMPLETE));
+  closesocket(sock);
+  
+  rc = shttp_shutdown(srv);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
   uv_thread_join(&tid);
   shttp_free(srv);
 }

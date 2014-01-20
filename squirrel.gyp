@@ -85,6 +85,7 @@
         'src/connection.c',
         'src/request.c',
         'src/response.c',
+        'src/error_response.c',
         'src/server.c',
         'src/sstring.c',
         'src/pool.c',
@@ -179,6 +180,7 @@
         'src/connection.c',
         'src/request.c',
         'src/response.c',
+        'src/error_response.c',
         'src/server.c',
         'src/sstring.c',
         'src/pool.c',
@@ -199,12 +201,14 @@
       'type': 'executable',
 
       'dependencies': [
-        'squirrel',
         'deps/http-parser/http_parser.gyp:http_parser',
+        'deps/uv/uv.gyp:libuv',
+        'squirrel',
       ],
       
       'include_dirs': [
         './include',
+        './src',
       ],
 
       'sources': [

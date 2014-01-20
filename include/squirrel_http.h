@@ -294,7 +294,9 @@ typedef int                                        shttp_res;
 #define SHTTP_RES_INSUFFICIENT_WRITE_BUFFER         -12
 #define SHTTP_RES_HEAD_LINE_TOO_LARGE               -13
 #define SHTTP_RES_ERROR_STATUS_CODE                 -14
-#define SHTTP_RES_PRINTF                             -15
+#define SHTTP_RES_PRINTF                            -15
+#define SHTTP_RES_BODY_NOT_COMPLETE                 -16
+#define SHTTP_RES_RESPONSE_ALREADY_FAILED           -17
 /**@}*/
 
 #define SHTTP_DELIMITER_STR ": "
@@ -362,6 +364,7 @@ DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
 
 DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *conn, void *data);
 
+DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data);
 DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data);
 
 /**
