@@ -21,9 +21,10 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status);
 
 
 DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
-  shttp_t                     *http = NULL;
-  shttp_connection_internal_t *conn = NULL;
-  char                        *ptr;
+  shttp_t                     *http = nil;
+  shttp_connection_internal_t *conn = nil;
+  shttp_context_internal_t    *ctx = nil;
+  char                        *ptr = nil;
   size_t                      i = 0;
 
   if (0 == shttp_pagesize) {
@@ -81,10 +82,16 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
     http->settings.max_connections_size = settings->max_connections_size;
   }
 
-  if (NULL == settings || settings->user_ctx_size < 0) {
-    http->settings.user_ctx_size = SHTTP_CTX_SIZE;
+  if (NULL == settings || settings->connection_user_ctx_size < 0) {
+    http->settings.connection_user_ctx_size = SHTTP_CONNECTION_USER_CTX_SIZE;
   } else {
-    http->settings.user_ctx_size = shttp_mem_align(settings->user_ctx_size);
+    http->settings.connection_user_ctx_size = shttp_mem_align(settings->connection_user_ctx_size);
+  }
+
+  if (NULL == settings || settings->context_user_ctx_size < 0) {
+    http->settings.context_user_ctx_size = SHTTP_CONTEXT_USER_CTX_SIZE;
+  } else {
+    http->settings.context_user_ctx_size = shttp_mem_align(settings->context_user_ctx_size);
   }
 
   if (NULL == settings || settings->rw_buffer_size <= 0) {
@@ -96,6 +103,7 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
   TAILQ_INIT(&http->connections);
   TAILQ_INIT(&http->free_connections);
   TAILQ_INIT(&http->listenings);
+  TAILQ_INIT(&http->free_contexts);
 
   memcpy(&http->settings.callbacks, &settings->callbacks, sizeof(shttp_callbacks_t));
   http->uv_loop = uv_loop_new();
@@ -104,43 +112,67 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
   _shttp_parser_init(&http->parser_settings);
 
   for(i = 0; i < http->settings.max_connections_size; ++i) {
-    ptr = (char*)sl_calloc(1,
-                           shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                           shttp_mem_align(http->settings.user_ctx_size) +
-                           (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count) +
-                           http->settings.rw_buffer_size);
+    ptr = (char*)sl_calloc(1, shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+                           http->settings.connection_user_ctx_size);
     conn = (shttp_connection_internal_t*)ptr;
-    conn->inner.http = http;
-    conn->inner.internal = conn;
-    conn->inner.pool = &conn->pool;
-    conn->inner.ctx = ptr + shttp_mem_align(sizeof(shttp_connection_internal_t));
+    conn->external.http = http;
+    conn->external.internal = conn;
+    conn->external.pool = &conn->pool;
+    TAILQ_INIT(&conn->contexts);
+
+    if(0 == http->settings.connection_user_ctx_size) {
+      conn->external.ctx = nil;
+    } else {
+      conn->external.ctx = ptr + shttp_mem_align(sizeof(shttp_connection_internal_t));
+    }
     conn->callbacks = &http->settings.callbacks;
 
-    conn->incomming.headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                                    shttp_mem_align(http->settings.user_ctx_size));
-    conn->incomming.headers.capacity = http->settings.max_headers_count;
-    conn->incomming.headers.length = 0;
-    conn->incomming.conn = conn;
-
-
-    conn->outgoing.headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                                   shttp_mem_align(http->settings.user_ctx_size) +
-                                   (sizeof(shttp_kv_t) * http->settings.max_headers_count));
-    conn->outgoing.headers.capacity = http->settings.max_headers_count;
-    conn->outgoing.head_write_buffers.capacity = shttp_head_write_buffers_size;
-    conn->outgoing.head_write_buffers.length = 0;
-    conn->outgoing.body_write_buffers.capacity = shttp_body_write_buffers_size;
-    conn->outgoing.body_write_buffers.length = 0;
-    conn->outgoing.call_after_writed.capacity = shttp_write_cb_buffers_size;
-    conn->outgoing.call_after_writed.length = 0;
-
-    conn->arena_base = ptr + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                                         http->settings.user_ctx_size, shttp_pagesize) +
-                       (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
-    conn->arena_capacity = http->settings.rw_buffer_size;
-    conn->arena_offset = 0;
-
     TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
+  }
+
+  
+  for(i = 0; i < (2*http->settings.max_connections_size); ++i) {
+    
+    ptr = (char*)sl_calloc(1, shttp_mem_align(sizeof(shttp_context_internal_t)) +
+                           http->settings.context_user_ctx_size +
+                           (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count) +
+                           http->settings.rw_buffer_size);
+
+    
+    ctx = (shttp_context_internal_t*)ptr;
+    if(0 == http->settings.context_user_ctx_size) {
+      conn->external.ctx = nil;
+    } else {
+      conn->external.ctx = ptr + shttp_mem_align(sizeof(shttp_context_internal_t));
+    }
+
+    ctx_incomming(ctx).headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_context_internal_t)) +
+                                    http->settings.context_user_ctx_size +
+                                   (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count)+ 
+                                   http->settings.rw_buffer_size);
+    ctx_incomming(ctx).headers.capacity = http->settings.max_headers_count;
+    ctx_incomming(ctx).headers.length = 0;
+
+
+    ctx_outgoing(ctx).headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_context_internal_t)) +
+                                   http->settings.context_user_ctx_size +
+                                   (sizeof(shttp_kv_t) * http->settings.max_headers_count));
+    ctx_outgoing(ctx).headers.capacity = http->settings.max_headers_count;
+    //ctx_outgoing(ctx).headers.length = 0;
+    ctx_outgoing(ctx).head_write_buffers.capacity = shttp_head_write_buffers_size;
+    ctx_outgoing(ctx).head_write_buffers.length = 0;
+    ctx_outgoing(ctx).call_after_completed.capacity = shttp_write_cb_buffers_size;
+    ctx_outgoing(ctx).call_after_completed.length = 0;
+    ctx_outgoing(ctx).body_write_buffers.capacity = shttp_body_write_buffers_size;
+    ctx_outgoing(ctx).body_write_buffers.length = 0;
+    ctx_outgoing(ctx).call_after_data_writed.capacity = shttp_write_cb_buffers_size;
+    ctx_outgoing(ctx).call_after_data_writed.length = 0;
+
+    ctx->arena_base = ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+                       http->settings.connection_user_ctx_size +
+                       (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
+    ctx->arena_capacity = http->settings.rw_buffer_size;
+    TAILQ_INSERT_TAIL(&http->free_contexts, ctx, next);
   }
   
   return (http);

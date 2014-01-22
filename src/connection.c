@@ -10,7 +10,6 @@ extern "C" {
 #endif
 
 
-#define SHTTP_STATUS_OK  200
 
 /*****************************************************************************
  * HTTP Server Callback Functions
@@ -51,92 +50,71 @@ end:
 }
 
 static void _shttp_on_disconnect(uv_handle_t* handle) {
-  shttp_connection_internal_t *inner;
+  shttp_connection_internal_t *conn;
   shttp_t            *http;
 
-  inner = (shttp_connection_internal_t*)handle->data;
-  http = inner->inner.http;
+  conn = (shttp_connection_internal_t*)handle->data;
+  http = conn->external.http;
 
-  TAILQ_REMOVE(&http->connections, inner, next);
-  TAILQ_INSERT_TAIL(&http->free_connections, inner, next);
+  assert(TAILQ_EMPTY(&conn->contexts));
+
+  TAILQ_REMOVE(&http->connections, conn, next);
+  TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
 }
 
 static void _shttp_on_head_writed(uv_write_t* req, int status) {
-  shttp_connection_internal_t *inner;
+  shttp_connection_internal_t *conn;
+  shttp_context_internal_t    *ctx;
   
-  inner = (shttp_connection_internal_t*)req->handle->data;
+  conn = (shttp_connection_internal_t*)req->handle->data;
+  conn = (shttp_connection_internal_t*)req->handle->data;
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
-    uv_close((uv_handle_t*) &inner->uv_handle, &_shttp_on_disconnect);
+    uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_on_disconnect);
     return;
   }
-  inner->outgoing.head_write_buffers.length = 0;
-  _shttp_response_send_ready_data(inner,
+  conn->outgoing.head_write_buffers.length = 0;
+  _shttp_response_send_ready_data(conn,
     &_shttp_on_disconnect,
     &_shttp_on_head_writed,
     &_shttp_on_writed);
 }
 
 static void _shttp_on_writed(uv_write_t* req, int status) {
-  shttp_connection_internal_t *inner;
+  shttp_connection_internal_t *conn;
+  shttp_context_internal_t    *ctx;
   
-  inner = (shttp_connection_internal_t*)req->handle->data;
+  conn = (shttp_connection_internal_t*)req->handle->data;
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
-    uv_close((uv_handle_t*) &inner->uv_handle, &_shttp_on_disconnect);
+    uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_on_disconnect);
     return;
   }
   
-  inner->outgoing.body_write_buffers.length = 0;
-  _shttp_response_call_hooks_after_writed(inner, &inner->outgoing);
+  ctx_outgoing(ctx).body_write_buffers.length = 0;
+  _shttp_response_call_hooks_after_writed(conn, &ctx_outgoing(ctx));
   
-  if(0 != inner->outgoing.body_write_buffers.length) {
-  _shttp_response_send_ready_data(inner,
-    &_shttp_on_disconnect, 
-    &_shttp_on_head_writed, 
-    &_shttp_on_writed);
+  if(0 != ctx_outgoing(ctx).body_write_buffers.length) {
+    _shttp_response_send_ready_data(conn,
+      &_shttp_on_disconnect, 
+      &_shttp_on_head_writed, 
+      &_shttp_on_writed);
   }
 }
 
+
 int _shttp_connection_on_message_begin(shttp_connection_internal_t* conn) {
-#ifdef DEBUG
-  shttp_t    *http;
-
-  http = (shttp_t*) conn->inner.http;
-#endif
-
-  memset(&conn->inner.response, 0, sizeof(shttp_response_t));
-  assert(((char*)conn->outgoing.headers.array) == (((char*)conn) + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-         shttp_mem_align(http->settings.user_ctx_size) +
-         (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
-  assert(conn->outgoing.headers.capacity == http->settings.max_headers_count);
-  assert(shttp_head_write_buffers_size == conn->outgoing.head_write_buffers.capacity);
-  assert(shttp_body_write_buffers_size == conn->outgoing.body_write_buffers.capacity);
-  assert(shttp_write_cb_buffers_size == conn->outgoing.call_after_writed.capacity);
-  
-  
-  assert(conn->outgoing.content_type.len == 0);
-  assert(conn->outgoing.content_type.str == nil);
-
-  conn->outgoing.write_req.data = nil;
-  conn->outgoing.head_write_buffers.length = 0;
-  conn->outgoing.body_write_buffers.length = 0;
-  conn->outgoing.call_after_writed.length = 0;
-  conn->outgoing.is_body_end = 0;
-  conn->outgoing.failed_code = 0;
-  conn->inner.response.headers.array = conn->outgoing.headers.array;
-  conn->inner.response.headers.length = 0;
-  conn->inner.response.http_major = conn->inner.request.http_major;
-  conn->inner.response.http_minor = conn->inner.request.http_minor;
-  conn->inner.response.status_code = SHTTP_STATUS_OK;
-  conn->inner.response.chunked = SHTTP_THUNKED_NONE;
-  conn->inner.response.close_connection = SHTTP_CLOSE_CONNECTION_NONE;
-
-  return conn->callbacks->on_message_begin(&conn->inner);
+  assert(nil == conn->current_ctx);
+  conn->current_ctx = _shttp_connection_get_new_ctx(conn->external.http);
+  return conn->callbacks->on_message_begin(&conn->external, &ctx->external);
 }
 
 int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at, size_t length) {
-  return conn->callbacks->on_body(&conn->inner, at, length);
+  
+
+  
+
+  return conn->callbacks->on_body(&conn->external, &ctx->external, at, length);
 }
 
 int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {

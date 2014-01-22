@@ -86,21 +86,40 @@ enum hw_http_method {
 
 
 
-typedef struct shttp_write_cb_s        shttp_write_cb_t;
+typedef struct shttp_ctx_write_cb_s    shttp_ctx_write_cb_t;
+typedef struct shttp_connection_cb_s   shttp_connection_cb_t;
 typedef struct shttp_uri_s             shttp_uri_t;
 typedef struct shttp_kv_s              shttp_kv_t;
 typedef struct shttp_request_s         shttp_request_t;
 typedef struct shttp_response_s        shttp_response_t;
+typedef struct shttp_context_s         shttp_context_t;
 typedef struct shttp_callbacks_s       shttp_callbacks_t;
 typedef struct http_handler_config_s   shttp_handler_config_t;
 typedef struct shttp_connection_s      shttp_connection_t;
 typedef struct shttp_settings_s        shttp_settings_t;
 typedef struct shttp_s                 shttp_t;
 
-typedef int  (*shttp_data_cb) (shttp_connection_t*, const char *at, size_t length);
-typedef int  (*shttp_cb) (shttp_connection_t*);
-typedef void (*shttp_write_cb) (shttp_connection_t *conn, void *data);
+typedef int  (*shttp_conntection_cb) (shttp_connection_t*);
+typedef int  (*shttp_ctx_data_cb) (shttp_connection_t*, 
+                                   shttp_context_t* ctx,
+                                   const char *at,
+                                   size_t length);
+typedef int  (*shttp_ctx_cb) (shttp_connection_t*, shttp_context_t* ctx);
+typedef void (*shttp_ctx_write_cb) (shttp_connection_t *conn, 
+                                   shttp_context_t* ctx,
+                                   void *data);
+typedef void (*shttp_connection_write_cb) (shttp_connection_t *conn, void *data);
 
+
+struct shttp_ctx_write_cb_s {
+  shttp_ctx_write_cb       cb;
+  void                     *data;
+};
+
+struct shttp_connection_cb_s {
+  shttp_connection_write_cb cb;
+  void                      *data;
+};
 
 /**
  * @brief structure containing a single callback and configuration
@@ -113,9 +132,11 @@ typedef void (*shttp_write_cb) (shttp_connection_t *conn, void *data);
  *
  */
 struct shttp_callbacks_s {
-  shttp_cb        on_message_begin;
-  shttp_data_cb   on_body;
-  shttp_cb        on_message_complete;
+  shttp_conntection_cb    on_connected;
+  shttp_ctx_cb            on_message_begin;
+  shttp_ctx_data_cb       on_message_body;
+  shttp_ctx_cb            on_message_complete;
+  shttp_conntection_cb    on_disconnected;
 };
 
 
@@ -135,11 +156,17 @@ struct shttp_settings_s {
    */
   size_t max_connections_size;
 
-#define SHTTP_CTX_SIZE         256
+#define SHTTP_CONNECTION_USER_CTX_SIZE         0
   /**
-   * the user context size per connection, default is SHTTP_CTX_SIZE
+   * the user context size per connection, default is SHTTP_CONNECTION_USER_CTX_SIZE
    */
-  size_t user_ctx_size;
+  size_t connection_user_ctx_size;
+
+#define SHTTP_CONTEXT_USER_CTX_SIZE            0
+  /**
+   * the user context size per request, default is SHTTP_CONTEXT_USER_CTX_SIZE
+   */
+  size_t context_user_ctx_size;
 
 #define SHTTP_MAX_HEADER_COUNT  256
   /**
@@ -261,6 +288,13 @@ struct shttp_response_s {
 
 struct shttp_connection_s {
   shttp_t           *http;
+  spool_t           *pool;
+  void              *ctx;
+  void              *internal;
+};
+
+
+struct shttp_context_s {
   shttp_request_t   request;
   shttp_response_t  response;
   spool_t           *pool;
@@ -268,12 +302,6 @@ struct shttp_connection_s {
   void              *internal;
 };
 
-
-struct shttp_write_cb_s {
-  // Callback info to free buffers
-  shttp_write_cb cb;
-  void *data;
-};
 
 /** @name Response codes
  */
@@ -324,36 +352,86 @@ DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
 DLL_VARIABLE void shttp_free(shttp_t *server);
 /**@}*/
 
+
+/** @name http connection methods
+ */
+/**@{*/
+
+DLL_VARIABLE cstring_t* shttp_connection_strerr(shttp_context_t *ctx);
+
+DLL_VARIABLE shttp_res shttp_connection_call_after_disconnected(shttp_context_t *ctx, 
+                                            shttp_ctx_write_cb cb,
+                                            void *cb_data);
+
+static inline void *shttp_connection_mem_malloc(shttp_connection_t *conn, size_t size) {
+  return spool_malloc(conn->pool, size);
+}
+static inline void *shttp_connection_mem_calloc(shttp_connection_t *conn, size_t size) {
+  void *p = spool_malloc(conn->pool, size);
+  if(nil != p) {
+    memset(p, 0, size);
+  }
+  return p;
+}
+static inline boolean shttp_connection_mem_try_realloc(shttp_connection_t *conn, void* p, size_t size) {
+  return (nil != spool_try_realloc(conn->pool, p, size));
+}
+static inline void *shttp_connection_mem_realloc(shttp_connection_t *conn, void* p, size_t size) {
+  return spool_realloc(conn->pool, p, size);
+}
+static inline void shttp_connection_mem_free(shttp_connection_t *conn, void *p) {
+  spool_free(conn->pool, p);
+}
+/**@}*/
+
 /** @name http response methods
  */
 /**@{*/
-DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_start(shttp_context_t *ctx,
     uint16_t status,
     const char *content_type,
     size_t content_type_len);
-DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
-DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_context_t *ctx);
+DLL_VARIABLE shttp_res shttp_response_write_header(shttp_context_t *ctx,
     const char *key,
     size_t     key_len,
     const char *value,
     size_t     value_len);
-DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_context_t *ctx,
     const char *key,
     size_t     key_len,
     const char *fmt,
     ...);
-DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_context_t *ctx,
     const char *data,
     int length);
-DLL_VARIABLE shttp_res shttp_response_write_nocopy(shttp_connection_t *conn,
-    const char *data,
-    int length);
-DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write(shttp_context_t *ctx,
     const char *data,
     int length,
-    shttp_write_cb cb,
+    shttp_ctx_write_cb cb,
     void *cb_data);
-DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
+DLL_VARIABLE shttp_res shttp_response_end(shttp_context_t *ctx);
+
+
+static inline void *shttp_context_mem_malloc(shttp_context_t *ctx, size_t size) {
+  return spool_malloc(ctx->pool, size);
+}
+static inline void *shttp_context_mem_calloc(shttp_context_t *ctx, size_t size) {
+  void *p = spool_malloc(ctx->pool, size);
+  if(nil != p) {
+    memset(p, 0, size);
+  }
+  return p;
+}
+static inline boolean shttp_context_mem_try_realloc(shttp_context_t *ctx, void* p, size_t size) {
+  return (nil != spool_try_realloc(ctx->pool, p, size));
+}
+static inline void *shttp_context_mem_realloc(shttp_context_t *ctx, void* p, size_t size) {
+  return spool_realloc(ctx->pool, p, size);
+}
+static inline void shttp_context_mem_free(shttp_context_t *ctx, void *p) {
+  spool_free(ctx->pool, p);
+}
 /**@}*/
 
 

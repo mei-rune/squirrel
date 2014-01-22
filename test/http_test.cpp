@@ -220,6 +220,26 @@ const char * raw= "GET /favicon.ico HTTP/1.1\r\n"
                   "Connection: keep-alive\r\n"
                   "\r\n";
 
+const char * pipeline_raw= "GET /favicon.ico HTTP/1.1\r\n"
+                  "Host: 0.0.0.0=5000\r\n"
+                  "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
+                  "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+                  "Accept-Language: en-us,en;q=0.5\r\n"
+                  "Accept-Encoding: gzip,deflate\r\n"
+                  "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
+                  "Keep-Alive: 300\r\n"
+                  "Connection: keep-alive\r\n"
+                  "\r\n""GET /favicon.ico HTTP/1.1\r\n"
+                  "Host: 0.0.0.0=5000\r\n"
+                  "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
+                  "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+                  "Accept-Language: en-us,en;q=0.5\r\n"
+                  "Accept-Encoding: gzip,deflate\r\n"
+                  "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
+                  "Keep-Alive: 300\r\n"
+                  "Connection: keep-alive\r\n"
+                  "\r\n";
+
 #define HELLO_WORLD "<html><body>HELLO WORLD!!!</body></html>"
 
 const char *HELLO_WORLD_RESPONSE = "HTTP/0.0 200 OK\r\nabc: abc\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nContent-Length: 40\r\n\r\n<html><body>HELLO WORLD!!!</body></html>";
@@ -335,6 +355,41 @@ TEST(http, simple) {
   ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
   s = max_recv(sock, buf, 2048, 2);
   ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+  
+  rc = shttp_shutdown(srv);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_join(&tid);
+  shttp_free(srv);
+}
+
+
+TEST(http, pipeline_request) {
+  shttp_settings_t settings;
+  shttp_t          *srv;
+  shttp_res        rc;
+  uv_thread_t      tid;
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  memset(&settings, 0, sizeof(shttp_settings_t));
+  settings.user_ctx_size = sizeof(usr_context_t);
+  shttp_set_log_callback(&on_log);
+
+  settings.callbacks.on_message_begin = &on_message_begin;
+  settings.callbacks.on_body = &on_body;
+  settings.callbacks.on_message_complete = &on_message_complete;
+  srv = shttp_create(&settings);
+  ASSERT_NE(nil, srv);
+  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
+  ASSERT_EQ(SHTTP_RES_OK, rc);
+  uv_thread_create(&tid, &start_web, srv);
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, pipeline_raw, strlen(pipeline_raw)));
+  s = max_recv(sock, buf, 2048, 2);
+  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE + strlen(HELLO_WORLD_RESPONSE), strlen(HELLO_WORLD_RESPONSE)));
   closesocket(sock);
   
   rc = shttp_shutdown(srv);
