@@ -14,16 +14,16 @@ extern "C" {
  ****************************************************************************/
 
 static void _on_error_message_writed(uv_write_t* req, int status) {
-  shttp_connection_internal_t *inner;
+  shttp_connection_internal_t *conn;
   uv_close_cb on_disconnect;
 
 
   on_disconnect = (uv_close_cb)req->data;
-  inner = (shttp_connection_internal_t*)req->handle->data;
+  conn = (shttp_connection_internal_t*)req->handle->data;
   
-  assert(0 == inner->outgoing.head_write_buffers.length);
-  inner->outgoing.body_write_buffers.length = 0;
-  _shttp_response_call_hooks_after_writed(inner, &inner->outgoing);
+  assert(0 == conn_outgoing(conn).head_write_buffers.length);
+  conn_outgoing(conn).body_write_buffers.length = 0;
+  _shttp_response_call_hooks_after_writed(conn);
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
   }
@@ -36,15 +36,17 @@ void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
                                      size_t message_len) {
   int rc;
   
-  conn->outgoing.body_write_buffers.array[0].base = message_str;
-  conn->outgoing.body_write_buffers.array[0].len = message_len;
-  conn->outgoing.body_write_buffers.length = 1;
+  _shttp_response_call_hooks_for_failed(conn);
 
-  conn->outgoing.write_req.data = on_disconnect;
-  rc = uv_write(&conn->outgoing.write_req,
+  conn_outgoing(conn).body_write_buffers.array[0].base = (char*)message_str;
+  conn_outgoing(conn).body_write_buffers.array[0].len = (ULONG)message_len;
+  conn_outgoing(conn).body_write_buffers.length = 1;
+
+  conn_outgoing(conn).write_req.data = on_disconnect;
+  rc = uv_write(&conn_outgoing(conn).write_req,
       (uv_stream_t*)&conn->uv_handle,
-      &conn->outgoing.body_write_buffers.array[0],
-      (unsigned long)conn->outgoing.body_write_buffers.length,
+      &conn_outgoing(conn).body_write_buffers.array[0],
+      (unsigned long)conn_outgoing(conn).body_write_buffers.length,
       _on_error_message_writed);
   if(0 != rc) {
     ERR("write: %s", uv_strerror(rc));
@@ -63,6 +65,8 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
   char                                 *buf;
   size_t                               buf_len;
   
+  _shttp_response_call_hooks_for_failed(conn);
+  
   va_start(args, fmt);
   buf_len = strlen(fmt) + 128;
   buf = (char*)sl_malloc(buf_len);
@@ -76,23 +80,24 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
     return;
   }
 
-  assert(0 == conn->outgoing.call_after_writed.length);
-  assert(0 == conn->outgoing.head_write_buffers.length);
-  assert(0 == conn->outgoing.body_write_buffers.length);
+  assert(0 == conn_outgoing(conn).call_after_completed.length);
+  assert(0 == conn_outgoing(conn).call_after_data_writed.length);
+  assert(0 == conn_outgoing(conn).head_write_buffers.length);
+  assert(0 == conn_outgoing(conn).body_write_buffers.length);
 
-  conn->outgoing.body_write_buffers.array[0].base = buf;
-  conn->outgoing.body_write_buffers.array[0].len = res;
-  conn->outgoing.body_write_buffers.length = 1;
+  conn_outgoing(conn).body_write_buffers.array[0].base = buf;
+  conn_outgoing(conn).body_write_buffers.array[0].len = res;
+  conn_outgoing(conn).body_write_buffers.length = 1;
 
-  conn->outgoing.call_after_writed.array[0].cb = &shttp_response_c_free;
-  conn->outgoing.call_after_writed.array[0].data = buf;
-  conn->outgoing.call_after_writed.length = 1;
+  conn_outgoing(conn).call_after_data_writed.array[0].cb = &shttp_response_c_free;
+  conn_outgoing(conn).call_after_data_writed.array[0].data = buf;
+  conn_outgoing(conn).call_after_data_writed.length = 1;
 
-  conn->outgoing.write_req.data = on_disconnect;
-  res = uv_write(&conn->outgoing.write_req,
+  conn_outgoing(conn).write_req.data = on_disconnect;
+  res = uv_write(&conn_outgoing(conn).write_req,
       (uv_stream_t*)&conn->uv_handle,
-      &conn->outgoing.body_write_buffers.array[0],
-      (unsigned long)conn->outgoing.body_write_buffers.length,
+      &conn_outgoing(conn).body_write_buffers.array[0],
+      (unsigned long)conn_outgoing(conn).body_write_buffers.length,
       _on_error_message_writed);
   if(0 != res) {
     ERR("write: %s", uv_strerror(res));

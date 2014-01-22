@@ -149,22 +149,22 @@ DLL_VARIABLE cstring_t* shttp_status_code_text(int status) {
 
 
 
-#define WRITE_TO_UV_BUF(inner_conn, write_buffers, buf, buf_len)                                               \
-    if(inner_conn->outgoing.write_buffers.capacity <= inner_conn->outgoing.write_buffers.length) {             \
-      return SHTTP_RES_INSUFFICIENT_WRITE_BUFFER;                                                              \
-    }                                                                                                          \
-    inner_conn->outgoing.write_buffers.array[inner_conn->outgoing.write_buffers.length].base = (buf);          \
-    inner_conn->outgoing.write_buffers.array[inner_conn->outgoing.write_buffers.length].len = (buf_len);       \
-    inner_conn->outgoing.write_buffers.length ++
+#define WRITE_TO_UV_BUF(conn, write_buffers, buf, buf_len)                                                             \
+    if(conn_outgoing(conn).write_buffers.capacity <= conn_outgoing(conn).write_buffers.length) {                       \
+      return SHTTP_RES_INSUFFICIENT_WRITE_BUFFER;                                                                      \
+    }                                                                                                                  \
+    conn_outgoing(conn).write_buffers.array[conn_outgoing(conn).write_buffers.length].base = (buf);                    \
+    conn_outgoing(conn).write_buffers.array[conn_outgoing(conn).write_buffers.length].len = (ULONG)(buf_len);          \
+    conn_outgoing(conn).write_buffers.length ++
 
 
-#define CALL_AFTER_WRITED(inner, func, func_data) if(inner->outgoing.call_after_writed.capacity <=             \
-                        inner->outgoing.call_after_writed.length) {                                            \
-      return SHTTP_RES_INSUFFICIENT_WRITE_CB_BUFFER;                                                           \
-    }                                                                                                          \
-    inner->outgoing.call_after_writed.array[inner->outgoing.call_after_writed.length].cb = (func);             \
-    inner->outgoing.call_after_writed.array[inner->outgoing.call_after_writed.length].data = (func_data)  ;    \
-    inner->outgoing.call_after_writed.length ++
+#define CALL_AFTER(conn, action, func, func_data) if(conn_outgoing(conn).call_after_##action.capacity <=               \
+                        conn_outgoing(conn).call_after_##action.length) {                                              \
+      return SHTTP_RES_INSUFFICIENT_WRITE_CB_BUFFER;                                                                   \
+    }                                                                                                                  \
+    conn_outgoing(conn).call_after_##action.array[conn_outgoing(conn).call_after_##action.length].cb = (func);         \
+    conn_outgoing(conn).call_after_##action.array[conn_outgoing(conn).call_after_##action.length].data = (func_data)  ;\
+    conn_outgoing(conn).call_after_##action.length ++
 
 #define conn_malloc(conn, size) spool_malloc((conn)->pool, (size))
 #define conn_realloc(inner, p, size) spool_realloc((conn)->pool, (p), (size))
@@ -181,68 +181,64 @@ char* conn_strdup(shttp_connection_t *inner, const char *c, size_t size) {
   return p;
 }
 
-#define copy_content_type(txt, txt_len)                                             \
-  if(txt_len > inner->outgoing.content_type.len) {                                  \
-    if(nil == inner->outgoing.content_type.len) {                                   \
-      inner->outgoing.content_type.len = sl_max(128, txt_len);                      \
-      inner->outgoing.content_type.str = (char*)spool_malloc(conn->pool,            \
+#define copy_content_type(conn, txt, txt_len)                                       \
+  if(txt_len > conn_outgoing(conn).content_type.len) {                              \
+    if(nil == conn_outgoing(conn).content_type.len) {                               \
+      conn_outgoing(conn).content_type.len = sl_max(128, txt_len);                  \
+      conn_outgoing(conn).content_type.str = (char*)spool_malloc(&conn->pool,       \
                                                      sl_max(128, txt_len));         \
-      if(nil == inner->outgoing.content_type.str) {                                 \
+      if(nil == conn_outgoing(conn).content_type.str) {                             \
         return SHTTP_RES_MEMORY;                                                    \
       }                                                                             \
     } else {                                                                        \
-      inner->outgoing.content_type.len = txt_len;                                   \
-      inner->outgoing.content_type.str = (char*)spool_realloc(conn->pool,           \
-        inner->outgoing.content_type.str, txt_len);                                 \
-      if(nil == inner->outgoing.content_type.str) {                                 \
+      conn_outgoing(conn).content_type.len = txt_len;                               \
+      conn_outgoing(conn).content_type.str = (char*)spool_realloc(&conn->pool,      \
+        conn_outgoing(conn).content_type.str, txt_len);                             \
+      if(nil == conn_outgoing(conn).content_type.str) {                             \
         return SHTTP_RES_MEMORY;                                                    \
       }                                                                             \
     }                                                                               \
   }                                                                                 \
-  conn->response.content_type.str = inner->outgoing.content_type.str;               \
-  conn->response.content_type.len = txt_len;                                        \
-  memcpy(inner->outgoing.content_type.str, txt, txt_len)
+  conn_response(conn).content_type.str = conn_outgoing(conn).content_type.str;      \
+  conn_response(conn).content_type.len = txt_len;                                   \
+  memcpy(conn_outgoing(conn).content_type.str, txt, txt_len)
 
 
-DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *external,
     uint16_t status,
     const char *content_type,
     size_t content_type_len) {
-  shttp_connection_internal_t          *inner;
+  shttp_connection_internal_t          *conn;
 
-  inner = (shttp_connection_internal_t*)conn->internal;
-  if(1 == inner->inner.response.head_writed) {
+  conn = (shttp_connection_internal_t*)external->internal;
+  if(1 == conn_response(conn).head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
-  assert(0 == inner->outgoing.is_body_end);
+  assert(0 == conn_outgoing(conn).is_body_end);
 
-  inner->inner.response.status_code = status;
-  copy_content_type(content_type, content_type_len);
+  conn_response(conn).status_code = status;
+  copy_content_type(conn, content_type, content_type_len);
   return SHTTP_RES_OK;
 }
 
-DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn) {
-  shttp_connection_internal_t          *inner;
-  inner = (shttp_connection_internal_t*)conn->internal;
-  if(1 == inner->inner.response.head_writed) {
+DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *external) {
+  shttp_connection_internal_t          *conn;
+  conn = (shttp_connection_internal_t*)external->internal;
+  if(1 == conn_response(conn).head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
-  assert(0 == inner->outgoing.is_body_end);
-  conn->response.chunked = 1;
+  assert(0 == conn_outgoing(conn).is_body_end);
+  conn_response(conn).chunked = 1;
   return SHTTP_RES_OK;
 }
 
 
-DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *conn, void *data) {
-  shttp_connection_internal_t          *inner;
-  inner = (shttp_connection_internal_t*)conn->internal;
-  spool_free(&inner->pool, data);
+DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *external, void *data) {
+  spool_free(external->pool, data);
 }
 
-DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data) {
-  shttp_connection_internal_t          *inner;
-  inner = (shttp_connection_internal_t*)conn->internal;
-  spool_free(&inner->pool, data);
+DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *external, void *data) {
+  spool_free(external->pool, data);
 }
 
 DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data) {
@@ -251,30 +247,30 @@ DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data) {
 
 
 
-#define do_predefine_headers(key, key_len, value, value_len)                               \
+#define do_predefine_headers(conn, key, key_len, value, value_len)                         \
   if(12 == key_len && 0 == strncmp("Content-Type", key, key_len)) {                        \
-    copy_content_type(value, value_len);                                                   \
+    copy_content_type(conn, value, value_len);                                                   \
     return SHTTP_RES_OK;                                                                   \
   } else if(17 == key_len && 0 == strncmp("Transfer-Encoding", key, key_len)) {            \
     if(7 == value_len && 0 == strncasecmp("chunked", value, value_len)) {                  \
-      if(SHTTP_THUNKED_NONE == conn->response.chunked ||                                   \
-        SHTTP_THUNKED_TRUE ==  conn->response.chunked) {                                   \
-        conn->response.chunked = SHTTP_THUNKED_TRUE;                                       \
+      if(SHTTP_THUNKED_NONE == conn_response(conn).chunked ||                              \
+        SHTTP_THUNKED_TRUE ==  conn_response(conn).chunked) {                              \
+        conn_response(conn).chunked = SHTTP_THUNKED_TRUE;                                  \
         return SHTTP_RES_OK;                                                               \
       }                                                                                    \
     }                                                                                      \
     return SHTTP_RES_HEAD_TRANSFER_ENCODING;                                               \
   } else if(10 == key_len && 0 == strncmp("Connection", key, key_len)) {                   \
     if(5 == value_len && 0 == strncasecmp("close", value, value_len)) {                    \
-       if(SHTTP_CLOSE_CONNECTION_NONE == conn->response.close_connection ||                \
-        SHTTP_CLOSE_CONNECTION_TRUE ==  conn->response.close_connection) {                 \
-        conn->response.close_connection = SHTTP_CLOSE_CONNECTION_TRUE;                     \
+       if(SHTTP_CLOSE_CONNECTION_NONE == conn_response(conn).close_connection ||           \
+        SHTTP_CLOSE_CONNECTION_TRUE ==  conn_response(conn).close_connection) {            \
+        conn_response(conn).close_connection = SHTTP_CLOSE_CONNECTION_TRUE;                \
         return SHTTP_RES_OK;                                                               \
       }                                                                                    \
     } else if(10 == value_len && 0 == strncasecmp("keep-alive", value, value_len)) {       \
-      if(SHTTP_CLOSE_CONNECTION_NONE == conn->response.close_connection ||                 \
-        SHTTP_CLOSE_CONNECTION_FALSE ==  conn->response.close_connection) {                \
-        conn->response.close_connection = SHTTP_CLOSE_CONNECTION_FALSE;                    \
+      if(SHTTP_CLOSE_CONNECTION_NONE == conn_response(conn).close_connection ||            \
+        SHTTP_CLOSE_CONNECTION_FALSE ==  conn_response(conn).close_connection) {           \
+        conn_response(conn).close_connection = SHTTP_CLOSE_CONNECTION_FALSE;               \
         return SHTTP_RES_OK;                                                               \
       }                                                                                    \
     }                                                                                      \
@@ -282,32 +278,32 @@ DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data) {
   }
 
 
-#define try_realloc_head_buffer(estimate_length, return_stmt)                              \
-  if(nil != inner->outgoing.head_buffer.str) {                                             \
-    new_capacity = sbuffer_unused_size(inner->outgoing.head_buffer);                       \
+#define try_realloc_head_buffer(conn, estimate_length, return_stmt)                        \
+  if(nil != conn_outgoing(conn).head_buffer.str) {                                         \
+    new_capacity = sbuffer_unused_size(conn_outgoing(conn).head_buffer);                   \
     if(estimate_length < new_capacity) {                                                   \
-      p = sbuffer_unused_addr(inner->outgoing.head_buffer);                                \
+      p = sbuffer_unused_addr(conn_outgoing(conn).head_buffer);                            \
       goto mem_copy_begin;                                                                 \
     }                                                                                      \
                                                                                            \
-    new_capacity = inner->outgoing.head_buffer.capacity +                                  \
+    new_capacity = conn_outgoing(conn).head_buffer.capacity +                              \
       shttp_align(sl_max(estimate_length, 256), shttp_cacheline_size);                     \
                                                                                            \
     if(nil != spool_try_realloc(pool,                                                      \
-      inner->outgoing.head_buffer.str,                                                     \
+      conn_outgoing(conn).head_buffer.str,                                                 \
       new_capacity)) {                                                                     \
-      inner->outgoing.head_buffer.capacity = new_capacity;                                 \
-      p = sbuffer_unused_addr(inner->outgoing.head_buffer);                                \
+      conn_outgoing(conn).head_buffer.capacity = new_capacity;                             \
+      p = sbuffer_unused_addr(conn_outgoing(conn).head_buffer);                            \
       goto mem_copy_begin;                                                                 \
     }                                                                                      \
                                                                                            \
-    if(0 == inner->outgoing.head_write_buffers.length) {                                   \
+    if(0 == conn_outgoing(conn).head_write_buffers.length) {                               \
        /* this is for first line of response.*/                                            \
-      inner->outgoing.head_write_buffers.length = 1;                                       \
+      conn_outgoing(conn).head_write_buffers.length = 1;                                   \
     }                                                                                      \
-    if(0 != sbuffer_length(inner->outgoing.head_buffer)) {                                 \
-      WRITE_TO_UV_BUF(inner, head_write_buffers, inner->outgoing.head_buffer.str,          \
-        sbuffer_length(inner->outgoing.head_buffer));                                      \
+    if(0 != sbuffer_length(conn_outgoing(conn).head_buffer)) {                             \
+      WRITE_TO_UV_BUF(conn, head_write_buffers, conn_outgoing(conn).head_buffer.str,       \
+        sbuffer_length(conn_outgoing(conn).head_buffer));                                  \
     }                                                                                      \
   }                                                                                        \
                                                                                            \
@@ -317,11 +313,11 @@ DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data) {
     return_stmt;                                                                           \
   }                                                                                        \
                                                                                            \
-  CALL_AFTER_WRITED(inner, &shttp_response_pool_free, p);                                  \
+  CALL_AFTER(conn, completed, &shttp_response_pool_free, p);                               \
                                                                                            \
-  inner->outgoing.head_buffer.str = p;                                                     \
-  inner->outgoing.head_buffer.capacity = new_capacity;                                     \
-  sbuffer_length_set(inner->outgoing.head_buffer, 0);                                      \
+  conn_outgoing(conn).head_buffer.str = p;                                                 \
+  conn_outgoing(conn).head_buffer.capacity = new_capacity;                                 \
+  sbuffer_length_set(conn_outgoing(conn).head_buffer, 0);                                  \
  
 #define head_buffer_append_delimiter(buf)                   \
   memcpy(buf, SHTTP_DELIMITER_STR, SHTTP_DELIMITER_LEN)
@@ -331,23 +327,23 @@ DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data) {
 
 
 
-static inline shttp_res _shttp_response_write_header_copy(shttp_connection_internal_t *inner,
+static inline shttp_res _shttp_response_write_header_copy(shttp_connection_internal_t *conn,
     const char *buf,
     size_t     buf_len) {
   spool_t                              *pool;
   size_t                               new_capacity;
   char                                 *p;
 
-  pool = &inner->pool;
-  try_realloc_head_buffer(buf_len, return SHTTP_RES_MEMORY);
+  pool = &conn->pool;
+  try_realloc_head_buffer(conn, buf_len, return SHTTP_RES_MEMORY);
 mem_copy_begin:
   memcpy(p, buf, buf_len);
-  sbuffer_length_add(inner->outgoing.head_buffer, buf_len);
+  sbuffer_length_add(conn_outgoing(conn).head_buffer, buf_len);
   return SHTTP_RES_OK;
 }
 
 
-static inline shttp_res _shttp_response_write_header_format(shttp_connection_internal_t *inner,
+static inline shttp_res _shttp_response_write_header_format(shttp_connection_internal_t *conn,
     size_t     estimate_length,
     const char *fmt,
     ...) {
@@ -359,13 +355,13 @@ static inline shttp_res _shttp_response_write_header_format(shttp_connection_int
   boolean                              tried;
 
   va_start(args, fmt);
-  pool = &inner->pool;
+  pool = &conn->pool;
   tried = false;
 
 #define return_st1 va_end(args); return SHTTP_RES_MEMORY
 
 retry:
-  try_realloc_head_buffer(estimate_length, return_st1);
+  try_realloc_head_buffer(conn, estimate_length, return_st1);
 mem_copy_begin:
   res = vsnprintf(p, new_capacity, fmt, args);
   if(-1 == res) {
@@ -377,67 +373,67 @@ mem_copy_begin:
     va_end(args);
     return SHTTP_RES_PRINTF;
   }
-  sbuffer_length_add(inner->outgoing.head_buffer, res);
+  sbuffer_length_add(conn_outgoing(conn).head_buffer, res);
   va_end(args);
   return SHTTP_RES_OK;
 }
 
-DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *external,
     const char *key,
     size_t     key_len,
     const char *value,
     size_t     value_len) {
-  shttp_connection_internal_t          *inner;
+  shttp_connection_internal_t          *conn;
   size_t                               estimate_length, new_capacity;
   spool_t                              *pool;
   char                                 *p;
 
-  inner = (shttp_connection_internal_t*)conn->internal;
+  conn = (shttp_connection_internal_t*)external->internal;
 
-  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+  if(SHTTP_RES_OK != conn_outgoing(conn).failed_code) {
     return SHTTP_RES_RESPONSE_ALREADY_FAILED;
   }
-  if(1 == inner->inner.response.head_writed) {
+  if(1 == conn_response(conn).head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
-  assert(0 == inner->outgoing.is_body_end);
+  assert(0 == conn_outgoing(conn).is_body_end);
 
-  do_predefine_headers(key, key_len, value, value_len);
+  do_predefine_headers(conn, key, key_len, value, value_len);
 
-  if(conn->request.headers.length >= inner->outgoing.headers.capacity) {
+  if(conn_request(conn).headers.length >= conn_outgoing(conn).headers.capacity) {
     return SHTTP_RES_HEAD_TOO_LARGE;
   }
 
-  pool = conn->pool;
+  pool = external->pool;
   estimate_length = key_len + SHTTP_DELIMITER_LEN + value_len + SHTTP_CRLF_LEN;
-  try_realloc_head_buffer(estimate_length, return SHTTP_RES_MEMORY);
+  try_realloc_head_buffer(conn, estimate_length, return SHTTP_RES_MEMORY);
 
 mem_copy_begin:
-  conn->request.headers.array[conn->request.headers.length].key.str = p;
-  conn->request.headers.array[conn->request.headers.length].key.len = key_len;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].key.str = p;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].key.len = key_len;
   memcpy(p, key, key_len);
   p += key_len;
   head_buffer_append_delimiter(p);
   p += SHTTP_DELIMITER_LEN;
 
-  conn->request.headers.array[conn->request.headers.length].val.str = p;
-  conn->request.headers.array[conn->request.headers.length].val.len = value_len;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].val.str = p;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].val.len = value_len;
   memcpy(p, value, value_len);
   p += value_len;
   head_buffer_append_crlf(p);
   p += SHTTP_CRLF_LEN;
 
-  sbuffer_length_add(inner->outgoing.head_buffer, p- (sbuffer_unused_addr(inner->outgoing.head_buffer)));
-  conn->request.headers.length += 1;
+  sbuffer_length_add(conn_outgoing(conn).head_buffer, p- (sbuffer_unused_addr(conn_outgoing(conn).head_buffer)));
+  conn_request(conn).headers.length += 1;
   return SHTTP_RES_OK;
 }
 
-DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *external,
     const char *key,
     size_t     key_len,
     const char *fmt,
     ...) {
-  shttp_connection_internal_t          *inner;
+  shttp_connection_internal_t          *conn;
   size_t                               estimate_length, new_capacity;
   int                                  res;
   spool_t                              *pool;
@@ -446,32 +442,32 @@ DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *co
   boolean                              tried;
   shttp_res                            rc;
 
-  inner = (shttp_connection_internal_t*)conn->internal;
+  conn = (shttp_connection_internal_t*)external->internal;
   
-  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+  if(SHTTP_RES_OK != conn_outgoing(conn).failed_code) {
     return SHTTP_RES_RESPONSE_ALREADY_FAILED;
   }
-  if(1 == inner->inner.response.head_writed) {
+  if(1 == conn_response(conn).head_writed) {
     return SHTTP_RES_HEAD_WRITED;
   }
-  assert(0 == inner->outgoing.is_body_end);
+  assert(0 == conn_outgoing(conn).is_body_end);
 
-  if(conn->request.headers.length >= inner->outgoing.headers.capacity) {
+  if(conn_request(conn).headers.length >= conn_outgoing(conn).headers.capacity) {
     return SHTTP_RES_HEAD_TOO_LARGE;
   }
 
   va_start(args, fmt);
 
   tried = false;
-  pool = conn->pool;
+  pool = external->pool;
   estimate_length = key_len + SHTTP_DELIMITER_LEN + strlen(fmt) + 32 + SHTTP_CRLF_LEN;
 
 retry:
-  try_realloc_head_buffer(estimate_length, goto failed);
+  try_realloc_head_buffer(conn, estimate_length, goto failed);
 
 mem_copy_begin:
-  new_capacity = sbuffer_unused_size(inner->outgoing.head_buffer);
-  p = sbuffer_unused_addr(inner->outgoing.head_buffer);
+  new_capacity = sbuffer_unused_size(conn_outgoing(conn).head_buffer);
+  p = sbuffer_unused_addr(conn_outgoing(conn).head_buffer);
   memcpy(p, key, key_len);
   head_buffer_append_delimiter(p + key_len);
   res = vsnprintf(p + key_len + SHTTP_DELIMITER_LEN,
@@ -486,7 +482,7 @@ mem_copy_begin:
     goto retry;
   }
 
-  do_predefine_headers(key, key_len, p + key_len + SHTTP_DELIMITER_LEN, res);
+  do_predefine_headers(conn, key, key_len, p + key_len + SHTTP_DELIMITER_LEN, res);
 
   estimate_length = key_len + SHTTP_DELIMITER_LEN + res + SHTTP_CRLF_LEN;
   if(new_capacity >= estimate_length) {
@@ -499,14 +495,14 @@ mem_copy_begin:
     goto retry;
   }
   head_buffer_append_crlf(p + key_len + SHTTP_DELIMITER_LEN + res);
-  sbuffer_length_add(inner->outgoing.head_buffer, estimate_length);
+  sbuffer_length_add(conn_outgoing(conn).head_buffer, estimate_length);
 
-  conn->request.headers.array[conn->request.headers.length].key.str = p;
-  conn->request.headers.array[conn->request.headers.length].key.len = key_len;
-  conn->request.headers.array[conn->request.headers.length].val.str = p + key_len + SHTTP_DELIMITER_LEN;
-  conn->request.headers.array[conn->request.headers.length].val.len = res;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].key.str = p;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].key.len = key_len;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].val.str = p + key_len + SHTTP_DELIMITER_LEN;
+  conn_request(conn).headers.array[conn_request(conn).headers.length].val.len = res;
 
-  conn->request.headers.length += 1;
+  conn_request(conn).headers.length += 1;
 
   va_end(args);
   return SHTTP_RES_OK;
@@ -521,94 +517,93 @@ failed:
 #define SHTTP_CONNECTION_KEEP_ALIVE_LEN      10
 #define SHTTP_CONNECTION_MAX_LEN             10
 
-static shttp_res _shttp_response_send_predefine_headers(shttp_connection_internal_t *inner,
-    shttp_connection_t *conn) {
+static shttp_res _shttp_response_send_predefine_headers(shttp_connection_internal_t *conn) {
   cstring_t     *status_code;
   int           res;
   shttp_res     rc;
   sbuf_t        buf;
 
-  status_code = shttp_status_code_text(conn->response.status_code);
+  status_code = shttp_status_code_text(conn_response(conn).status_code);
   if(nil == status_code) {
     return SHTTP_RES_ERROR_STATUS_CODE;
   }
 
-#define _shttp_header_copy(inner, buf, buf_len)                 \
-  rc = _shttp_response_write_header_copy(inner, buf, buf_len);  \
-  if(SHTTP_RES_OK != rc) {                                      \
-    return rc;                                                  \
+#define _shttp_header_copy(conn, buf, buf_len)                 \
+  rc = _shttp_response_write_header_copy(conn, buf, buf_len);  \
+  if(SHTTP_RES_OK != rc) {                                     \
+    return rc;                                                 \
   }
 
   //  Connection header
-  _shttp_header_copy(inner,
+  _shttp_header_copy(conn,
                      "Connection" SHTTP_DELIMITER_STR,
                      10 + SHTTP_DELIMITER_LEN);
 
-  switch(conn->response.close_connection) {
+  switch(conn_response(conn).close_connection) {
   case SHTTP_CLOSE_CONNECTION_NONE:
-    if(0 == http_should_keep_alive(&inner->incomming.parser)) {
-      _shttp_header_copy(inner,
+    if(0 == http_should_keep_alive(&conn->parser)) {
+      _shttp_header_copy(conn,
                          SHTTP_CONNECTION_CLOSE_STR SHTTP_CRLF_STR,
                          SHTTP_CONNECTION_CLOSE_LEN + SHTTP_CRLF_LEN);
     } else {
-      _shttp_header_copy(inner,
+      _shttp_header_copy(conn,
                          SHTTP_CONNECTION_KEEP_ALIVE_STR SHTTP_CRLF_STR,
                          SHTTP_CONNECTION_KEEP_ALIVE_LEN + SHTTP_CRLF_LEN);
     }
     break;
   case SHTTP_CLOSE_CONNECTION_TRUE:
-    _shttp_header_copy(inner,
+    _shttp_header_copy(conn,
                        SHTTP_CONNECTION_KEEP_ALIVE_STR SHTTP_CRLF_STR,
                        SHTTP_CONNECTION_KEEP_ALIVE_LEN + SHTTP_CRLF_LEN);
     break;
   default:
-    _shttp_header_copy(inner,
+    _shttp_header_copy(conn,
                        SHTTP_CONNECTION_CLOSE_STR SHTTP_CRLF_STR,
                        SHTTP_CONNECTION_CLOSE_LEN + SHTTP_CRLF_LEN);
     break;
   }
 
   // Content-Type Header
-  _shttp_header_copy(inner,
+  _shttp_header_copy(conn,
                      "Content-Type" SHTTP_DELIMITER_STR,
                      12 + SHTTP_DELIMITER_LEN);
-  _shttp_header_copy(inner,
-                     conn->response.content_type.str,
-                     conn->response.content_type.len);
-  _shttp_header_copy(inner, SHTTP_CRLF_STR, SHTTP_CRLF_LEN);
+  _shttp_header_copy(conn,
+                     conn_response(conn).content_type.str,
+                     conn_response(conn).content_type.len);
+  _shttp_header_copy(conn, SHTTP_CRLF_STR, SHTTP_CRLF_LEN);
 
   // Transfer-Encoding AND Content-Length Header
-  if(SHTTP_THUNKED_TRUE == conn->response.chunked) {
-    _shttp_header_copy(inner,
+  if(SHTTP_THUNKED_TRUE == conn_response(conn).chunked) {
+    _shttp_header_copy(conn,
                        "Transfer-Encoding" SHTTP_DELIMITER_STR "chunked" SHTTP_CRLF_STR,
                        17 + SHTTP_DELIMITER_LEN + 7 + SHTTP_CRLF_LEN);
-  } else if(((size_t)-1) != conn->response.content_length) { // Content-Length Header
-    rc = _shttp_response_write_header_format(inner, 28,
+  } else if(((size_t)-1) != conn_response(conn).content_length) { // Content-Length Header
+    rc = _shttp_response_write_header_format(conn, 28,
          "Content-Length" SHTTP_DELIMITER_STR "%d" SHTTP_CRLF_STR,
-         conn->response.content_length);
+         conn_response(conn).content_length);
     if(SHTTP_RES_OK != rc) {
       return rc;
     }
   }
-  if(0 == inner->outgoing.head_write_buffers.length) {
-    inner->outgoing.head_write_buffers.length = 1;
+  if(0 == conn_outgoing(conn).head_write_buffers.length) {
+    conn_outgoing(conn).head_write_buffers.length = 1;
   }
   
-  _shttp_header_copy(inner, SHTTP_CRLF_STR, SHTTP_CRLF_LEN);
-  WRITE_TO_UV_BUF(inner, head_write_buffers,
-        inner->outgoing.head_buffer.str,
-        sbuffer_length(inner->outgoing.head_buffer));
-  sbuffer_zero(inner->outgoing.head_buffer);
+  _shttp_header_copy(conn, SHTTP_CRLF_STR, SHTTP_CRLF_LEN);
+  WRITE_TO_UV_BUF(conn, head_write_buffers,
+        conn_outgoing(conn).head_buffer.str,
+        sbuffer_length(conn_outgoing(conn).head_buffer));
+  sbuffer_zero(conn_outgoing(conn).head_buffer);
 
-  res = spool_prepare_alloc(conn->pool, &buf);
+  res = spool_prepare_alloc(&conn->pool, &buf);
   if(SHTTP_RES_OK != res) {
     return res;
   }
 
   res = snprintf(buf.str, buf.len, "HTTP/%d.%d %d ",
-                 conn->response.http_major,
-                 conn->response.http_minor,
-                 conn->response.status_code);
+                 conn_response(conn).http_major,
+                 conn_response(conn).http_minor,
+                 conn_response(conn).status_code);
   if(-1 == res) {
     goto failed;
   }
@@ -619,129 +614,120 @@ static shttp_res _shttp_response_send_predefine_headers(shttp_connection_interna
   memcpy(buf.str + res, status_code->str, status_code->len);
   head_buffer_append_crlf(buf.str + res + status_code->len);
 
-  inner->outgoing.head_write_buffers.array[0].base = buf.str;
-  inner->outgoing.head_write_buffers.array[0].len = res + status_code->len + SHTTP_CRLF_LEN;
-  if(0 == inner->outgoing.head_write_buffers.length) {
-    inner->outgoing.head_write_buffers.length = 1;
+  conn_outgoing(conn).head_write_buffers.array[0].base = buf.str;
+  conn_outgoing(conn).head_write_buffers.array[0].len = (ULONG)(res + status_code->len + SHTTP_CRLF_LEN);
+  if(0 == conn_outgoing(conn).head_write_buffers.length) {
+    conn_outgoing(conn).head_write_buffers.length = 1;
   }
 
-  spool_commit_alloc(conn->pool, res + status_code->len + SHTTP_CRLF_LEN);
+  spool_commit_alloc(&conn->pool, res + status_code->len + SHTTP_CRLF_LEN);
   return SHTTP_RES_OK;
 failed:
-  spool_rollback_alloc(conn->pool);
+  spool_rollback_alloc(&conn->pool);
   return SHTTP_RES_MEMORY;
 }
 
-DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
+DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *external,
     const char *data,
-    int length,
+    size_t length,
     shttp_write_cb cb,
     void *cb_data) {
-  shttp_res                            rc;
-  shttp_connection_internal_t          *inner;
-  inner = (shttp_connection_internal_t*)conn->internal;
+  shttp_connection_internal_t          *conn;
+  conn = (shttp_connection_internal_t*)external->internal;
 
-  inner->inner.response.content_length += length;
+  conn_response(conn).content_length += length;
   
-  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+  if(SHTTP_RES_OK != conn_outgoing(conn).failed_code) {
     return SHTTP_RES_RESPONSE_ALREADY_FAILED;
   }
 
-  WRITE_TO_UV_BUF(inner, body_write_buffers, (char*)data, length);
+  WRITE_TO_UV_BUF(conn, body_write_buffers, (char*)data, length);
   if(nil != cb) {
-    CALL_AFTER_WRITED(inner, cb, cb_data);
+    CALL_AFTER(conn, data_writed, cb, cb_data);
   }
   return SHTTP_RES_OK;
 }
 
-DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn) {
+DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *external) {
   shttp_res                            rc;
-  shttp_connection_internal_t          *inner;
-  inner = (shttp_connection_internal_t*)conn->internal;
+  shttp_connection_internal_t          *conn;
+  conn = (shttp_connection_internal_t*)external->internal;
   
-  if(SHTTP_RES_OK != inner->outgoing.failed_code) {
+  if(SHTTP_RES_OK != conn_outgoing(conn).failed_code) {
     return SHTTP_RES_RESPONSE_ALREADY_FAILED;
   }
-  if(1 != inner->inner.response.head_writed) {
-    assert(0 == inner->outgoing.is_body_end);
-    rc = _shttp_response_send_predefine_headers(inner, &inner->inner);
+  if(1 != conn_response(conn).head_writed) {
+    assert(0 == conn_outgoing(conn).is_body_end);
+    rc = _shttp_response_send_predefine_headers(conn);
     if(SHTTP_RES_OK != rc) {
       ERR("callback: write predefine header failed.");
-      inner->outgoing.failed_code = rc;
+      conn_outgoing(conn).failed_code = rc;
       return rc;
     }
-    inner->inner.response.head_writed = 1;
+    conn_response(conn).head_writed = 1;
   }
 
   
-  if(nil != inner->outgoing.content_type.str) {
-    spool_free(&inner->pool, inner->outgoing.content_type.str);
-    inner->outgoing.content_type.len = 0;
-    inner->outgoing.content_type.str = nil;
+  if(nil != conn_outgoing(conn).content_type.str) {
+    spool_free(&conn->pool, conn_outgoing(conn).content_type.str);
+    conn_outgoing(conn).content_type.len = 0;
+    conn_outgoing(conn).content_type.str = nil;
   }
 
 
-  assert(0 == inner->outgoing.is_body_end);
-  inner->outgoing.is_body_end = 1;
+  assert(0 == conn_outgoing(conn).is_body_end);
+  conn_outgoing(conn).is_body_end = 1;
   return SHTTP_RES_OK;
 }
-
 
 void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
                                      uv_close_cb on_disconnect,
                                      uv_write_cb on_head_writed,
-                                     uv_write_cb on_writed) {
+                                     uv_write_cb on_data_writed) {
   int rc;
   
-  if(SHTTP_RES_OK != conn->outgoing.failed_code) {
-
-    conn->outgoing.head_write_buffers.length = 0;
-    conn->outgoing.body_write_buffers.length = 0;
-    _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
+  if(SHTTP_RES_OK != conn_outgoing(conn).failed_code) {
     _shttp_response_send_error_message_format(conn, on_disconnect, 
-      INTERNAL_ERROR_FROMAT, shttp_strerr(conn->outgoing.failed_code));
+      INTERNAL_ERROR_FROMAT, shttp_strerr(conn_outgoing(conn).failed_code));
     return;
   }
 
-  if(0 == conn->outgoing.is_body_end &&
-    0 == conn->inner.response.chunked) {
-    conn->outgoing.failed_code = SHTTP_RES_BODY_NOT_COMPLETE;
-    ERR("callback: chunked must is true while body is not completed.");    
-    
-    conn->outgoing.head_write_buffers.length = 0;
-    conn->outgoing.body_write_buffers.length = 0;
-    _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
+  if(0 == conn_outgoing(conn).is_body_end &&
+    0 == conn_response(conn).chunked) {
+    ERR("callback: chunked must is true while body is not completed.");
+    conn_outgoing(conn).failed_code = SHTTP_RES_BODY_NOT_COMPLETE;
     _shttp_response_send_error_message(conn, on_disconnect, 
       BODY_NOT_COMPLETE, strlen(BODY_NOT_COMPLETE));
     return;
   }
 
-  if(1 != conn->inner.response.head_writed) {
-    assert(0 == conn->outgoing.is_body_end);
-    rc = _shttp_response_send_predefine_headers(conn, &conn->inner);
+  if(1 != conn_response(conn).head_writed) {
+    assert(0 == conn_outgoing(conn).is_body_end);
+    rc = _shttp_response_send_predefine_headers(conn);
     if(SHTTP_RES_OK != rc) {
       ERR("callback: write predefine header failed.");
       goto failed;
     }
-    conn->inner.response.head_writed = 1;
+    conn_response(conn).head_writed = 1;
   }
 
-  if(0 == conn->outgoing.head_write_buffers.length) {
-    if(0 == conn->outgoing.body_write_buffers.length) {
+  if(0 == conn_outgoing(conn).head_write_buffers.length) {
+    if(0 == conn_outgoing(conn).body_write_buffers.length) {
       ERR("callback: write buffers is empty.");
+      rc = SHTTP_RES_RESPONSE_BODY_IS_EMPTY;
       goto failed;
     }
     
-    rc = uv_write(&conn->outgoing.write_req,
+    rc = uv_write(&conn_outgoing(conn).write_req,
       (uv_stream_t*)&conn->uv_handle,
-      &conn->outgoing.body_write_buffers.array[0],
-      (unsigned long)conn->outgoing.body_write_buffers.length,
-      on_writed);
+      &conn_outgoing(conn).body_write_buffers.array[0],
+      (unsigned long)conn_outgoing(conn).body_write_buffers.length,
+      on_data_writed);
   } else {
-    rc = uv_write(&conn->outgoing.write_req,
+    rc = uv_write(&conn_outgoing(conn).write_req,
       (uv_stream_t*)&conn->uv_handle,
-      &conn->outgoing.head_write_buffers.array[0],
-      (unsigned long)conn->outgoing.head_write_buffers.length,
+      &conn_outgoing(conn).head_write_buffers.array[0],
+      (unsigned long)conn_outgoing(conn).head_write_buffers.length,
       on_head_writed);
   }
   if(0 == rc) {
@@ -749,9 +735,8 @@ void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
   }
   ERR("write: %s", uv_strerror(rc));
 failed:  
-  conn->outgoing.head_write_buffers.length = 0;
-  conn->outgoing.body_write_buffers.length = 0;
-  _shttp_response_call_hooks_after_writed(conn, &conn->outgoing);
+  conn_outgoing(conn).failed_code = rc;
+  _shttp_response_call_hooks_for_failed(conn);
   uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
   return;
 }

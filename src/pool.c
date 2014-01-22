@@ -195,7 +195,6 @@ static inline void *_spool_try_realloc(spool_t *pool, spool_block_t *block, char
 
 DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size) {
   spool_block_t    *block;
-  void             *new_ptr;
 
   block = PTR_TO_BLOCK(p);
   assert(SPOOL_MAGIC == block->magic);

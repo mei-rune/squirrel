@@ -147,13 +147,6 @@ struct shttp_settings_s {
    */
   size_t max_headers_count;
 
-#define SHTTPE_MAX_HEADER_SIZE  4*1024
-  /**
-   * max headers size, default is SHTTP_HEADER_SIZE_MAX
-   */
-  size_t max_headers_size;
-
-
 #define SHTTP_MAC_BODY_SIZE    1024*1024*1024
   /**
    * max body bytes, default is SHTTP_MAC_BODY_SIZE
@@ -297,6 +290,8 @@ typedef int                                        shttp_res;
 #define SHTTP_RES_PRINTF                            -15
 #define SHTTP_RES_BODY_NOT_COMPLETE                 -16
 #define SHTTP_RES_RESPONSE_ALREADY_FAILED           -17
+#define SHTTP_RES_RESPONSE_BODY_IS_EMPTY            -18
+#define SHTTP_RES_RESPONSE_ALREADY_END           -17
 /**@}*/
 
 #define SHTTP_DELIMITER_STR ": "
@@ -342,15 +337,9 @@ DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *co
     size_t     key_len,
     const char *fmt,
     ...);
-DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_connection_t *conn,
-    const char *data,
-    int length);
-DLL_VARIABLE shttp_res shttp_response_write_nocopy(shttp_connection_t *conn,
-    const char *data,
-    int length);
 DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
     const char *data,
-    int length,
+    size_t length,
     shttp_write_cb cb,
     void *cb_data);
 DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
