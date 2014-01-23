@@ -29,6 +29,8 @@
 *.opensdf
 *.ncrunchsolution*
 *.sdf
+*.vsp
+*.psess
 
 # Build artifacts
 Default/

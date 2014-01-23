@@ -716,7 +716,6 @@ void on_cookie_error(void* cb) {
 
 
 TEST(pool, cookie) {
-  size_t  i, bytes;
   spool_t pool;
   char    *mem;
   void    *p;
@@ -739,7 +738,7 @@ TEST(pool, cookie) {
 
 
 TEST(pool, transaction) {
-  size_t  i, bytes;
+  size_t  i;
   spool_t pool;
   char    *mem;
   void    *p;

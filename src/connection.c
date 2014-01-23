@@ -19,7 +19,7 @@ static void _shttp_connection_on_disconnect(uv_handle_t* handle);
 static int _shttp_connection_start_read(shttp_connection_internal_t* conn);
 static int _shttp_connection_stop_read(shttp_connection_internal_t* conn);
 
-  
+
 
 static void _shttp_on_null_disconnect(uv_handle_t* server_handle) {
   sl_free(server_handle);
@@ -64,10 +64,10 @@ static inline void _shttp_connection_assert(shttp_t* http, shttp_connection_inte
 static inline void _shttp_connection_assert_external(shttp_t* http, shttp_connection_internal_t* conn) {
   _shttp_connection_assert(http, conn);
 
-  assert(((char*)conn_outgoing(conn).headers.array) == (((char*)conn) + 
-                        shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                        http->settings.user_ctx_size +
-                        (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
+  assert(((char*)conn_outgoing(conn).headers.array) == (((char*)conn) +
+         shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+         http->settings.user_ctx_size +
+         (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
   assert(conn_outgoing(conn).headers.capacity == http->settings.max_headers_count);
 
   assert(shttp_head_write_buffers_size == conn_outgoing(conn).head_write_buffers.capacity);
@@ -75,7 +75,7 @@ static inline void _shttp_connection_assert_external(shttp_t* http, shttp_connec
   assert(shttp_write_cb_buffers_size == conn_outgoing(conn).call_after_data_writed.capacity);
   assert(shttp_write_cb_buffers_size == conn_outgoing(conn).call_after_completed.capacity);
 
-  
+
   assert(0 == conn_outgoing(conn).call_after_data_writed.length);
   assert(0 == conn_outgoing(conn).call_after_completed.length);
   assert(0 == conn_outgoing(conn).content_type.len);
@@ -119,7 +119,7 @@ static void _shttp_connection_on_disconnect(uv_handle_t* handle) {
 
 static void _shttp_connection_on_head_writed(uv_write_t* req, int status) {
   shttp_connection_internal_t *conn;
-  
+
   conn = (shttp_connection_internal_t*)req->handle->data;
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
@@ -130,15 +130,15 @@ static void _shttp_connection_on_head_writed(uv_write_t* req, int status) {
   }
   conn_outgoing(conn).head_write_buffers.length = 0;
   _shttp_response_send_ready_data(conn,
-    &_shttp_connection_on_disconnect, 
-    &_shttp_connection_on_head_writed, 
-    &_shttp_connection_on_data_writed);
+                                  &_shttp_connection_on_disconnect,
+                                  &_shttp_connection_on_head_writed,
+                                  &_shttp_connection_on_data_writed);
 }
 
 static void _shttp_connection_on_data_writed(uv_write_t* req, int status) {
   shttp_connection_internal_t *conn;
   int res;
-  
+
   conn = (shttp_connection_internal_t*)req->handle->data;
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
@@ -147,34 +147,32 @@ static void _shttp_connection_on_data_writed(uv_write_t* req, int status) {
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return;
   }
-  
+
   conn_outgoing(conn).body_write_buffers.length = 0;
   if(0 != conn_outgoing(conn).is_body_end) {
     _shttp_response_call_hooks_after_writed(conn);
     _shttp_response_call_hooks_after_completed(conn);
     _shttp_response_assert_after_response_end(conn);
-  
+
     res = _shttp_connection_start_read(conn);
-    if(0 != res){
+    if(0 != res) {
       ERR("read_start: %d.", uv_strerror(res));
       conn_outgoing(conn).failed_code = SHTTP_RES_UV;
       uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     }
     return;
-  } 
-  
+  }
+
   _shttp_response_call_hooks_after_writed(conn);
-  
+
   _shttp_response_send_ready_data(conn,
-    &_shttp_connection_on_disconnect, 
-    &_shttp_connection_on_head_writed, 
-    &_shttp_connection_on_data_writed);
+                                  &_shttp_connection_on_disconnect,
+                                  &_shttp_connection_on_head_writed,
+                                  &_shttp_connection_on_data_writed);
 }
 
 int _shttp_connection_on_message_begin(shttp_connection_internal_t* conn) {
   _shttp_connection_recycle_request_and_response(conn);
-  
-  conn->headers_bytes_count = 0;
   conn->head_reading = 1;
   return conn->callbacks->on_message_begin(&conn_external(conn));
 }
@@ -183,11 +181,18 @@ int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at
   return conn->callbacks->on_body(&conn_external(conn), at, length);
 }
 
+int _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn) {
+  if (1 == conn->head_reading) {
+    conn->arena_offset = shttp_align(conn->parser.nread, shttp_cacheline_size);
+  }
+  conn->head_reading = 0;
+}
+
 int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
   int        res;
   spool_init(&conn->pool, ((char*)conn->arena_base) + conn->arena_offset,
-    conn->arena_capacity - conn->arena_offset);
-  
+             conn->arena_capacity - conn->arena_offset);
+
   assert(shttp_message_request_parse_end == conn->status);
   conn->status = shttp_message_response_begin;
   res = conn->callbacks->on_message_complete(&conn_external(conn));
@@ -208,10 +213,10 @@ int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
   }
 
   _shttp_response_send_ready_data(conn,
-    &_shttp_connection_on_disconnect, 
-    &_shttp_connection_on_head_writed, 
-    &_shttp_connection_on_data_writed);
-  return 0;
+                                  &_shttp_connection_on_disconnect,
+                                  &_shttp_connection_on_head_writed,
+                                  &_shttp_connection_on_data_writed);
+  return -1;
 }
 
 static void _shttp_on_connection_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf) {
@@ -230,9 +235,15 @@ static void _shttp_on_connection_alloc(uv_handle_t* req, size_t suggested_size, 
   buf->len = (unsigned long)(inner->arena_capacity - offset);
 }
 
+static inline void _shttp_connection_init_parser(shttp_connection_internal_t *conn) {
+  conn->status = shttp_message_request_parse_begin;
+  http_parser_init(&conn->parser, HTTP_REQUEST);
+  conn->parser.data = conn;
+}
 static void _shttp_on_connection_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf) {
   size_t                      parsed;
   shttp_connection_internal_t *conn;
+  int                         http_errno;
 
   conn = (shttp_connection_internal_t*)tcp->data;
   if (nread <= 0) {
@@ -246,22 +257,25 @@ static void _shttp_on_connection_read(uv_stream_t* tcp, ssize_t nread, const uv_
 
 
   parsed = http_parser_execute(&conn->parser, &conn_external(conn).http->parser_settings, buf->base, nread);
-  if (nread != parsed) {
-    if(HPE_OK != HTTP_PARSER_ERRNO(&conn->parser)) {
+  http_errno = HTTP_PARSER_ERRNO(&conn->parser);
+
+  if(HPE_OK != http_errno) {
+    if(HPE_CB_message_complete != http_errno) {
       ERR("parse error:%s", http_errno_name(HTTP_PARSER_ERRNO(&conn->parser)));
-    } else {
-      ERR("parse error: parsed is 0.");
+      uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
+      return;
+    } else if (nread != parsed) {
+      ERR("parse error: pipeline mode is not supported.");
+      uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
+      return;
     }
+    _shttp_connection_init_parser(conn);
+  } else if (nread != parsed) {
+    ERR("parse error: pipeline mode is not supported.");
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return;
   }
-  if (0 == conn->head_reading) {
-    if (0 == conn->headers_bytes_count) {
-      conn->arena_offset += nread;
-    } else {
-      conn->arena_offset = shttp_align(conn->headers_bytes_count, shttp_cacheline_size);
-    }
-  }
+
   return;
 }
 
@@ -285,17 +299,15 @@ void _shttp_on_connect(uv_stream_t* server_handle, int status) {
 
   conn = TAILQ_LAST(&http->free_connections, shttp_connections_s);
   conn->arena_offset = 0;
-  
+
   // init uv_handle
   uv_tcp_init(http->uv_loop, &conn->uv_handle);
   conn->uv_handle.data = conn;
-  
-  // init http parser
-  conn->status = shttp_message_request_parse_begin;
-  http_parser_init(&conn->parser, HTTP_REQUEST);
-  conn->parser.data = conn;
 
-  
+  // init http parser
+  _shttp_connection_init_parser(conn);
+
+
   _shttp_connection_assert(http, conn);
   rc = uv_accept(server_handle, (uv_stream_t*)&conn->uv_handle);
   if(rc) {
@@ -325,8 +337,16 @@ int _shttp_connection_stop_read(shttp_connection_internal_t* conn) {
 
 int _shttp_connection_start_read(shttp_connection_internal_t* conn) {
   return uv_read_start((uv_stream_t*)&conn->uv_handle,
-                     _shttp_on_connection_alloc,
-                     _shttp_on_connection_read);
+                       _shttp_on_connection_alloc,
+                       _shttp_on_connection_read);
+}
+
+DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *external, void *data) {
+  spool_free(external->pool, data);
+}
+
+DLL_VARIABLE void shttp_connection_c_free (shttp_connection_t *conn, void *data) {
+  sl_free(data);
 }
 
 #ifdef __cplusplus

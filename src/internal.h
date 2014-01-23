@@ -94,7 +94,7 @@ typedef struct shttp_write_cb_buffer_s {
 typedef struct shttp_incomming_s {
   // should init while creating
   shttp_kv_array_t                       headers;
-  
+
   // should init while new request is arrived
   cstring_t                              url;
 } shttp_incomming_t;
@@ -108,7 +108,7 @@ typedef struct shttp_outgoing_s {
   shttp_write_cb_buffer_t                  call_after_completed;
   shttp_write_cb_buffer_t                  call_after_data_writed;
 
-  
+
   // should init while new request is arrived
   uv_write_t                               write_req;
   sstring_t                                content_type;
@@ -129,15 +129,15 @@ typedef struct shttp_connection_internal_s {
   size_t                                   arena_capacity;
   size_t                                   arena_offset;
 
-  
-  // should init while new connection is   arrived
+
+  // should init while new connection is arrived
   uv_tcp_t                                 uv_handle;
-  shttp_message_request_parse_status_t                   status;
+  shttp_message_request_parse_status_t     status;
   struct http_parser                       parser;
-  
+
   // should init while new request is arrived
   uint32_t                                 head_reading;
-  uint32_t                                 headers_bytes_count;
+
   TAILQ_ENTRY(shttp_connection_internal_s) next;
 } shttp_connection_internal_t;
 
@@ -199,12 +199,12 @@ void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
                                      uv_write_cb on_data_writed);
 void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
                                         uv_close_cb on_disconnect,
-                                         const char* message_str,
-                                         size_t message_len);
+                                        const char* message_str,
+                                        size_t message_len);
 void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn,
-                                        uv_close_cb on_disconnect,
-                                        const char  *fmt,
-                                        ...);
+    uv_close_cb on_disconnect,
+    const char  *fmt,
+    ...);
 
 #ifdef DEBUG
 static inline void _shttp_response_assert_after_response_end(shttp_connection_internal_t *conn) {
@@ -213,7 +213,7 @@ static inline void _shttp_response_assert_after_response_end(shttp_connection_in
   assert(0 == conn_outgoing(conn).call_after_data_writed.length);
   assert(0 == conn_outgoing(conn).call_after_completed.length);
 }
-#else 
+#else
 #define _shttp_response_assert_after_response_end(conn)
 #endif
 

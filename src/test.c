@@ -33,6 +33,39 @@ void output(out_fn_t out_fn, const char* fmt, ...) {
   va_end( argList );
 }
 
+
+DLL_VARIABLE int RUN_TEST_BY_NAME(const char* nm, out_fn_t out) {
+  TestCase* next;
+
+  next = g_unittestlist._next;
+  while(0 != next) {
+    if(0 == strcmp(nm, next->name)) {
+      (*(next->func))(out);
+    }
+    next = next->_next;
+  }
+  return 0;
+}
+
+DLL_VARIABLE int RUN_TEST_BY_CATALOG(const char* nm, out_fn_t out) {
+  char fmt[512];
+  TestCase* next;
+  snprintf(fmt, 512, "[%%%us] OK\r\n", name_max_len);
+
+  output(out, "=============== unit test ===============\r\n");
+  next = g_unittestlist._next;
+  while(0 != next) {
+    if(0 == strncmp(nm, next->name, strlen(nm))) {
+      (*(next->func))(out);
+      output(out, fmt, next->name);
+    }
+    next = next->_next;
+  }
+
+  output(out, "=============== end ===============\r\n");
+  return 0;
+}
+
 DLL_VARIABLE int RUN_ALL_TESTS(out_fn_t out) {
   char fmt[512];
   TestCase* next;
@@ -41,11 +74,9 @@ DLL_VARIABLE int RUN_ALL_TESTS(out_fn_t out) {
   output(out, "=============== unit test ===============\r\n");
   next = g_unittestlist._next;
   while(0 != next) {
-    //TestCase* old = next;
     (*(next->func))(out);
     output(out, fmt, next->name);
     next = next->_next;
-    //my_free(old);
   }
 
   output(out, "=============== end ===============\r\n");

@@ -32,6 +32,7 @@
           },
           'VCLinkerTool': {
             'LinkIncremental': 2, # enable incremental linking
+            'Profile': 'true',
           },
         },
         'msvs_configuration_attributes': {

@@ -5,6 +5,7 @@
 #define HELLO_WORLD "<html><body>HELLO WORLD!!!</body></html>"
 
 static cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
+static cstring_t HTTP_HELLO_WORLD = { 9, HELLO_WORLD};
 
 typedef struct usr_context_s {
   int                 status;
@@ -32,18 +33,18 @@ void on_message_send (shttp_connection_t* conn, void *act) {
   case 0:
     shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
     shttp_response_write_header(conn, "abc", 3, "abc", 3);
-    shttp_response_write(conn, "abc", 3, &on_message_send, act);
+    shttp_response_write(conn, HTTP_HELLO_WORLD.str, HTTP_HELLO_WORLD.len-3, &on_message_send, act);
   case 1:
-    shttp_response_write(conn, "abc", 3, &on_message_send, act);
+    shttp_response_write(conn, HTTP_HELLO_WORLD.str - (HTTP_HELLO_WORLD.len-3), 3, &on_message_send, act);
   case 2:
     shttp_response_end(conn);
   }
 }
 
 int  on_message_complete (shttp_connection_t* conn) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
-  ctx->status = 0;
-  on_message_send(conn, ctx);
+  shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_write(conn, HTTP_HELLO_WORLD.str, HTTP_HELLO_WORLD.len, nil, nil);
+  shttp_response_end(conn);
   return 0;
 }
 
@@ -51,6 +52,9 @@ int main(int argc, char** argv) {
   shttp_settings_t settings;
   shttp_t          *srv;
   shttp_res        rc;
+
+  HTTP_CONTENT_TEXT_HTML.len = strlen(HTTP_CONTENT_TEXT_HTML.str);
+  HTTP_HELLO_WORLD.len = strlen(HTTP_HELLO_WORLD.str);
 
   memset(&settings, 0, sizeof(shttp_settings_t));
   settings.user_ctx_size = sizeof(usr_context_t);

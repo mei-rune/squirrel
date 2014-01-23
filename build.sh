@@ -39,28 +39,12 @@ if [ ! -d "deps/uv/build/gyp" ]; then
 fi
 
 if [ $OS = $PLATFORM_WINDOWS ]; then
-    # Compiling wrk
-    echo "----------------------------------------"
-    echo "Compiling wrk"
-    echo "----------------------------------------"
-    cd tools/wrk
-    mingw32-make
-    cd ../../
-
     echo "----------------------------------------"
     echo "Configuring for ${OS} & Visual Studio"
     echo "----------------------------------------"
     $GYP --depth=. -Icommon.gypi -Dwithout_ssl=true -Dwithout_pthread=true -Dlibrary=static_library -Dtarget_arch=x64 --build=$CONFIGURATION squirrel.gyp
     msbuild /p:Configuration=$CONFIGURATION squirrel.sln
 else
-    # Compiling wrk
-    echo "----------------------------------------"
-    echo "Compiling wrk"
-    echo "----------------------------------------"
-    cd tools/wrk
-    make
-    cd ../../
-
     echo "----------------------------------------"
     echo "Configuring and compiling for ${OS}"
     echo "----------------------------------------"

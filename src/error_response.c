@@ -20,7 +20,7 @@ static void _on_error_message_writed(uv_write_t* req, int status) {
 
   on_disconnect = (uv_close_cb)req->data;
   conn = (shttp_connection_internal_t*)req->handle->data;
-  
+
   assert(0 == conn_outgoing(conn).head_write_buffers.length);
   conn_outgoing(conn).body_write_buffers.length = 0;
   _shttp_response_call_hooks_after_writed(conn);
@@ -31,11 +31,11 @@ static void _on_error_message_writed(uv_write_t* req, int status) {
 }
 
 void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
-                                     void (*on_disconnect)(uv_handle_t* handle),
-                                     const char* message_str,
-                                     size_t message_len) {
+                                        void (*on_disconnect)(uv_handle_t* handle),
+                                        const char* message_str,
+                                        size_t message_len) {
   int rc;
-  
+
   _shttp_response_call_hooks_for_failed(conn);
 
   conn_outgoing(conn).body_write_buffers.array[0].base = (char*)message_str;
@@ -44,10 +44,10 @@ void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
 
   conn_outgoing(conn).write_req.data = on_disconnect;
   rc = uv_write(&conn_outgoing(conn).write_req,
-      (uv_stream_t*)&conn->uv_handle,
-      &conn_outgoing(conn).body_write_buffers.array[0],
-      (unsigned long)conn_outgoing(conn).body_write_buffers.length,
-      _on_error_message_writed);
+                (uv_stream_t*)&conn->uv_handle,
+                &conn_outgoing(conn).body_write_buffers.array[0],
+                (unsigned long)conn_outgoing(conn).body_write_buffers.length,
+                _on_error_message_writed);
   if(0 != rc) {
     ERR("write: %s", uv_strerror(rc));
     uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
@@ -57,16 +57,16 @@ void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
 
 
 void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn,
-                                        uv_close_cb on_disconnect,
-                                        const char  *fmt,
-                                        ...) {
+    uv_close_cb on_disconnect,
+    const char  *fmt,
+    ...) {
   int                                  res;
   va_list                              args;
   char                                 *buf;
   size_t                               buf_len;
-  
+
   _shttp_response_call_hooks_for_failed(conn);
-  
+
   va_start(args, fmt);
   buf_len = strlen(fmt) + 128;
   buf = (char*)sl_malloc(buf_len);
@@ -95,10 +95,10 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
 
   conn_outgoing(conn).write_req.data = on_disconnect;
   res = uv_write(&conn_outgoing(conn).write_req,
-      (uv_stream_t*)&conn->uv_handle,
-      &conn_outgoing(conn).body_write_buffers.array[0],
-      (unsigned long)conn_outgoing(conn).body_write_buffers.length,
-      _on_error_message_writed);
+                 (uv_stream_t*)&conn->uv_handle,
+                 &conn_outgoing(conn).body_write_buffers.array[0],
+                 (unsigned long)conn_outgoing(conn).body_write_buffers.length,
+                 _on_error_message_writed);
   if(0 != res) {
     ERR("write: %s", uv_strerror(res));
     uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);

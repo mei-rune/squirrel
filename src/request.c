@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 int _shttp_connection_on_message_begin(shttp_connection_internal_t*);
+int _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn);
 int _shttp_connection_on_body (shttp_connection_internal_t*, const char *at, size_t length);
 int _shttp_connection_on_message_complete (shttp_connection_internal_t*);
 
@@ -17,13 +18,12 @@ static int _http_request_on_message_begin(http_parser* inner) {
   shttp_connection_internal_t* conn;
   conn = (shttp_connection_internal_t*)inner->data;
   conn->status = shttp_message_request_parse_begin;
-  conn->head_reading = 0;
   return _shttp_connection_on_message_begin(conn);
 }
 
 static int _http_request_on_status(http_parser *inner, const char *at, size_t length) {
   shttp_connection_internal_t* conn;
-  
+
   conn = (shttp_connection_internal_t*)inner->data;
   conn->status = shttp_message_request_parse_status;
   return 0;
@@ -31,7 +31,7 @@ static int _http_request_on_status(http_parser *inner, const char *at, size_t le
 
 static int _http_request_on_url(http_parser *inner, const char *at, size_t length) {
   shttp_connection_internal_t* conn;
-  
+
   conn = (shttp_connection_internal_t*)inner->data;
   switch (conn->status) {
   case shttp_message_request_parse_begin:
@@ -169,11 +169,11 @@ static int _http_request_on_header_value(http_parser *inner, const char *at, siz
 
 static int _http_request_on_headers_complete(http_parser* inner) {
   shttp_connection_internal_t* conn;
+  int                          rc;
 
   conn = (shttp_connection_internal_t*)inner->data;
   conn->status = shttp_message_request_parse_body;
-  conn->head_reading = 1;
-  conn->headers_bytes_count = conn->parser.nread;
+
   conn_request(conn).headers.array = conn_incomming(conn).headers.array;
   conn_request(conn).headers.length = conn_incomming(conn).headers.length;
   conn_request(conn).http_major = inner->http_major;
@@ -181,7 +181,11 @@ static int _http_request_on_headers_complete(http_parser* inner) {
   conn_request(conn).method = inner->method;
   conn_request(conn).content_length = inner->content_length;
 
-  return _parse_url(conn);
+  rc = _parse_url(conn);
+  if(0 != rc) {
+    return rc;
+  }
+  return _shttp_connection_on_headers_complete(conn);
 }
 
 static int _http_request_on_body(http_parser *inner, const char *at, size_t length) {

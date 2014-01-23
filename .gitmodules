@@ -10,7 +10,3 @@
 [submodule "deps/http-parser"]
 	path = deps/http-parser
 	url = https://github.com/joyent/http-parser.git
-[submodule "tools/wrk"]
-	path = tools/wrk
-	url = https://github.com/wg/wrk.git
-	branch = pipeline

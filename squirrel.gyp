@@ -89,9 +89,10 @@
         'src/server.c',
         'src/sstring.c',
         'src/pool.c',
-        'src/os_win.c',
+        'src/os.c',
         'src/log.c',
         'src/cacheline.c',
+        'src/utils.c',
         'src/test.c',
       ],
 
@@ -184,9 +185,10 @@
         'src/server.c',
         'src/sstring.c',
         'src/pool.c',
-        'src/os_win.c',
+        'src/os.c',
         'src/log.c',
         'src/cacheline.c',
+        'src/utils.c',
         'src/test.c',
       ],
 

@@ -176,11 +176,14 @@ void __cdecl test_##a##_##b##_run(out_fn_t out_fn)
 
 DLL_VARIABLE int ADD_RUN_TEST(const char* nm, void (__cdecl *func)(out_fn_t fn));
 DLL_VARIABLE int RUN_ALL_TESTS(out_fn_t out);
+DLL_VARIABLE int RUN_TEST_BY_NAME(const char* nm, out_fn_t out);
+DLL_VARIABLE int RUN_TEST_BY_CATALOG(const char* nm, out_fn_t out);
 #else
 
 #define TEST(a, b)  void __cdecl test_##a##_##b##_run(out_fn_t out_fn)
 #define ADD_RUN_TEST(nm, func)
 #define RUN_ALL_TESTS(out)
+#define RUN_TEST_BY_NAME(nm, out);
 
 #endif
 

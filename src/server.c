@@ -107,7 +107,7 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
     conn_external(conn).http = http;
     conn_external(conn).internal = conn;
     conn_external(conn).pool = &conn->pool;
-    
+
     if(0 == http->settings.user_ctx_size) {
       conn_external(conn).ctx = nil;
     } else {
@@ -118,14 +118,14 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
 
     // init connection.incomming
     conn_incomming(conn).headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                                    shttp_mem_align(http->settings.user_ctx_size));
+                                         shttp_mem_align(http->settings.user_ctx_size));
     conn_incomming(conn).headers.capacity = http->settings.max_headers_count;
     conn_incomming(conn).headers.length = 0;
-    
+
     // init connection.outgoing
     conn_outgoing(conn).headers.array = (shttp_kv_t*) (ptr + shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-                                   shttp_mem_align(http->settings.user_ctx_size) +
-                                   (sizeof(shttp_kv_t) * http->settings.max_headers_count));
+                                        shttp_mem_align(http->settings.user_ctx_size) +
+                                        (sizeof(shttp_kv_t) * http->settings.max_headers_count));
     conn_outgoing(conn).headers.capacity = http->settings.max_headers_count;
     //conn_outgoing(conn).headers.length = 0;
     conn_outgoing(conn).head_write_buffers.capacity = shttp_head_write_buffers_size;
@@ -139,13 +139,13 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
 
     conn->arena_base = ptr + shttp_align(shttp_mem_align(sizeof(shttp_connection_internal_t)) +
                                          http->settings.user_ctx_size, shttp_pagesize) +
-                                         (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
+                       (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
     conn->arena_capacity = http->settings.rw_buffer_size;
     conn->arena_offset = 0;
 
     TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
   }
-  
+
   return (http);
 }
 

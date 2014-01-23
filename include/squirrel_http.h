@@ -291,7 +291,8 @@ typedef int                                        shttp_res;
 #define SHTTP_RES_BODY_NOT_COMPLETE                 -16
 #define SHTTP_RES_RESPONSE_ALREADY_FAILED           -17
 #define SHTTP_RES_RESPONSE_BODY_IS_EMPTY            -18
-#define SHTTP_RES_RESPONSE_ALREADY_END           -17
+#define SHTTP_RES_RESPONSE_ALREADY_END              -19
+#define SHTTP_RES_INVALID_PARAMETERS                -20
 /**@}*/
 
 #define SHTTP_DELIMITER_STR ": "
@@ -319,9 +320,55 @@ DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
 DLL_VARIABLE void shttp_free(shttp_t *server);
 /**@}*/
 
+
+
+/** @name http connection methods
+*/
+/**@{*/
+
+DLL_VARIABLE cstring_t* shttp_connection_strerr(shttp_connection_t *ctx);
+
+DLL_VARIABLE shttp_res shttp_connection_call_after_disconnected(shttp_connection_t *ctx,
+    shttp_write_cb cb, void *cb_data);
+
+static inline void *shttp_connection_mem_malloc(shttp_connection_t *conn, size_t size) {
+  return spool_malloc(conn->pool, size);
+}
+
+static inline void *shttp_connection_mem_calloc(shttp_connection_t *conn, size_t size) {
+  void *p = spool_malloc(conn->pool, size);
+  if(nil != p) {
+    memset(p, 0, size);
+  }
+  return p;
+}
+
+static inline boolean shttp_connection_mem_try_realloc(shttp_connection_t *conn, void* p, size_t size) {
+  return (nil != spool_try_realloc(conn->pool, p, size));
+}
+
+static inline void *shttp_connection_mem_realloc(shttp_connection_t *conn, void* p, size_t size) {
+  return spool_realloc(conn->pool, p, size);
+}
+
+static inline void shttp_connection_mem_free(shttp_connection_t *conn, void *p) {
+  spool_free(conn->pool, p);
+}
+
+
+DLL_VARIABLE void shttp_connection_c_free (shttp_connection_t *conn, void *data);
+DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *conn, void *data);
+/**@}*/
+
 /** @name http response methods
  */
 /**@{*/
+DLL_VARIABLE shttp_res shttp_response_call_after_writed(shttp_connection_t *ctx,
+    shttp_write_cb cb, void *cb_data);
+
+DLL_VARIABLE shttp_res shttp_response_call_after_completed(shttp_connection_t *ctx,
+    shttp_write_cb cb, void *cb_data);
+
 DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
     uint16_t status,
     const char *content_type,
@@ -343,6 +390,34 @@ DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
     shttp_write_cb cb,
     void *cb_data);
 DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
+
+
+static inline void *shttp_response_mem_malloc(shttp_connection_t *conn, size_t size) {
+  return spool_malloc(conn->pool, size);
+}
+
+static inline void *shttp_response_mem_calloc(shttp_connection_t *conn, size_t size) {
+  void *p = spool_malloc(conn->pool, size);
+  if(nil != p) {
+    memset(p, 0, size);
+  }
+  return p;
+}
+
+static inline boolean shttp_response_mem_try_realloc(shttp_connection_t *conn, void* p, size_t size) {
+  return (nil != spool_try_realloc(conn->pool, p, size));
+}
+
+static inline void *shttp_response_mem_realloc(shttp_connection_t *conn, void* p, size_t size) {
+  return spool_realloc(conn->pool, p, size);
+}
+
+static inline void shttp_response_mem_free(shttp_connection_t *conn, void *p) {
+  spool_free(conn->pool, p);
+}
+
+DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data);
+DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data);
 /**@}*/
 
 
@@ -350,11 +425,6 @@ DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
  */
 /**@{*/
 DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
-
-DLL_VARIABLE void shttp_connection_pool_free (shttp_connection_t *conn, void *data);
-
-DLL_VARIABLE void shttp_response_c_free (shttp_connection_t *conn, void *data);
-DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data);
 
 /**
   A callback function used to intercept Libevent's log messages.
