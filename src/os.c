@@ -10,7 +10,10 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
 int shttp_win32_version = 0;
+#endif
+
 int shttp_pagesize = 0;
 int shttp_ncpu = 0;
 int shttp_cacheline_size = SHTTP_CPU_CACHE_LINE;
@@ -27,9 +30,11 @@ void os_init() {
   u_int               osviex;
   OSVERSIONINFOEX     osvi;
 
+  if (0 != shttp_pagesize) {
+    return ;
+  }
 
   /* get Windows version */
-
   memset(&osvi, 0, sizeof(OSVERSIONINFOEX));
   osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
 
@@ -39,6 +44,7 @@ void os_init() {
     osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
     if (GetVersionEx((OSVERSIONINFO *) &osvi) == 0) {
       ERR("GetVersionEx() failed, errno=%d", GetLastError());
+      exit(-1);
       return ;
     }
   }

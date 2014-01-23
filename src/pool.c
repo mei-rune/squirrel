@@ -47,14 +47,7 @@ cookie_cb_t cookie_cb;
 DLL_VARIABLE void spool_init(spool_t *pool, char* p, size_t capacity) {
   int i;
 
-  if (0 == shttp_pagesize) {
-    os_init();
-
-    if (0 == shttp_pagesize) {
-      ERR("Please first call os_init() or os_init() failed.");
-      return;
-    }
-  }
+  os_init();
 
   for(i =0; i < SPOOL_SLOTS; i ++) {
     TAILQ_INIT(&pool->free_slots[i]);

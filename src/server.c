@@ -26,15 +26,7 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
   char                        *ptr;
   size_t                      i = 0;
 
-  if (0 == shttp_pagesize) {
-    os_init();
-
-    if (0 == shttp_pagesize) {
-      ERR("Please first call os_init() or os_init() failed.");
-      return NULL;
-    }
-  }
-
+  os_init();
 
   http = (shttp_t*)sl_calloc(1, sizeof(shttp_t));
 
