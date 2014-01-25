@@ -185,7 +185,7 @@ DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char 
   UV_CHECK(rc, http->uv_loop, "init");
   listening->uv_handle.data = listening;
 
-  rc = uv_tcp_bind(&listening->uv_handle, addr);
+  rc = uv_tcp_bind(&listening->uv_handle, addr, 0);
   UV_CHECK(rc, http->uv_loop, "bind");
 
   rc = uv_listen((uv_stream_t*)&listening->uv_handle, 128, &_shttp_on_connect);

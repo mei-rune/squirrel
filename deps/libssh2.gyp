@@ -80,10 +80,16 @@
     {
       'target_name': 'libssh2_test',
       'type': 'executable',
-      'sources': [ 'libssh2/test/simple.c' ],
+      'sources': [ 'libssh2/tests/simple.c' ],
       'dependencies': [
         'libssh2'
       ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
       'conditions': [
         ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
           'cflags': [ '--std=c89' ],
