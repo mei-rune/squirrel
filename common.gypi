@@ -8,6 +8,7 @@
     'msvs_multi_core_compile': '0',  # we do enable multicore compiles
     'gcc_version%': 'unknown',
     'clang%': 0,
+    'luvit_skinny': 'true',
   },
 
   'target_defaults': {

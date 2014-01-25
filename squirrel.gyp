@@ -19,6 +19,8 @@
         'deps/oniguruma.gyp:oniguruma_ctest',
         'deps/oniguruma.gyp:oniguruma_utest',
         'deps/yajl.gyp:yajl_copy_headers',
+        'deps/libssh2.gyp:libssh2',
+        'deps/libssh2.gyp:libssh2_test',
       ],
      'export_dependent_settings': [
        'deps/yajl.gyp:yajl',

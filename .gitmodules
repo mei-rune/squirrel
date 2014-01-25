@@ -1,6 +1,6 @@
 [submodule "deps/openssl"]
 	path = deps/openssl
-	url = https://github.com/luvit/openssl.git
+	url = https://github.com/runner-mei/openssl.git
 [submodule "deps/yajl"]
 	path = deps/yajl
 	url = https://github.com/lloyd/yajl.git
@@ -10,3 +10,6 @@
 [submodule "deps/http-parser"]
 	path = deps/http-parser
 	url = https://github.com/joyent/http-parser.git
+[submodule "deps/libssh2"]
+	path = deps/libssh2
+	url = git://git.libssh2.org/libssh2.git
