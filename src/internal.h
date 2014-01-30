@@ -267,6 +267,7 @@ static inline void _shttp_response_assert_after_response_end(shttp_connection_in
 
 
 void _shttp_status_init();
+int stats_handler(shttp_connection_t* external);
 
 #ifdef __cplusplus
 }

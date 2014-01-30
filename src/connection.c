@@ -293,7 +293,14 @@ int _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn) {
 int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
   int        res;
 
-  res = conn->callbacks->on_message_complete(&conn_external(conn));
+  if((6 == conn_request(conn).uri.path.len &&
+    0 == strncmp("/stats", conn_request(conn).uri.path.str, 6)) ||
+    (7 == conn_request(conn).uri.path.len &&
+    0 == strncmp("/stats/", conn_request(conn).uri.path.str, 7))) {
+    res = stats_handler(&conn_external(conn));
+  } else {
+    res = conn->callbacks->on_message_complete(&conn_external(conn));
+  }
   if(0 != res) {
     ERR("callback: result of callback is %d.", res);
     conn_outgoing(conn).failed_code = res;
