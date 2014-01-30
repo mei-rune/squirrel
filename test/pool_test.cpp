@@ -710,9 +710,9 @@ TEST(pool, simple) {
 }
 
 
-static int cookie_error = 0;
-void on_cookie_error(void* cb) {
-  cookie_error ++;
+void on_cookie_error(void* ctx, void* cb) {
+  int* cookie_error = (int*)ctx;
+  (*cookie_error)++;
 }
 
 
@@ -720,12 +720,14 @@ TEST(pool, cookie) {
   spool_t pool;
   char    *mem;
   void    *p;
+  int     cookie_error;
 
 #define max_size_cookie (1024)
   mem = (char*)malloc(max_size_cookie);
   spool_init(&pool, mem, max_size_cookie);
 
   cookie_error =0;
+  cookie_ctx = &cookie_error;
   cookie_cb = &on_cookie_error;
 
   p = spool_malloc(&pool, 8);
@@ -735,6 +737,7 @@ TEST(pool, cookie) {
   ASSERT_EQ(1, cookie_error);
   free(mem);
   cookie_cb = nil;
+  cookie_ctx = nil;
 }
 
 
@@ -751,8 +754,6 @@ TEST(pool, transaction) {
   mem = (char*)malloc(max_size_transaction);
   spool_init(&pool, mem, max_size_transaction);
 
-  cookie_error =0;
-  cookie_cb = &on_cookie_error;
 
 
   p = spool_malloc(&pool, 2);

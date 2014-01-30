@@ -217,6 +217,8 @@ static inline void _shttp_response_call_hooks_after_writed(shttp_connection_inte
   call_for(conn, data_writed);
 }
 
+
+
 void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
                                      uv_close_cb on_disconnect,
                                      uv_write_cb on_head_writed,
@@ -229,6 +231,7 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
     uv_close_cb on_disconnect,
     const char  *fmt,
     ...);
+void _shttp_response_on_completed(shttp_connection_internal_t *conn, int status);
 
 #ifdef DEBUG
 static inline void _shttp_response_assert_after_response_end(shttp_connection_internal_t *conn) {
@@ -240,17 +243,6 @@ static inline void _shttp_response_assert_after_response_end(shttp_connection_in
 #else
 #define _shttp_response_assert_after_response_end(conn)
 #endif
-
-static inline void _shttp_response_call_hooks_for_failed(shttp_connection_internal_t *conn) {
-  assert(SHTTP_RES_OK != conn_outgoing(conn).failed_code);
-  conn_outgoing(conn).head_write_buffers.length = 0;
-  conn_outgoing(conn).body_write_buffers.length = 0;
-
-  _shttp_response_call_hooks_after_writed(conn);
-  _shttp_response_call_hooks_after_completed(conn);
-
-  _shttp_response_assert_after_response_end(conn);
-}
 
 
 

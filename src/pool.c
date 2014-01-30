@@ -27,23 +27,25 @@ extern "C" {
 #define spool_cookie_addr(b)          (((char*)b) + SPOOL_BLOCK_HEAD_USED_SIZE + (b)->used_size)
 #define assert_cookie(b)              if(nil != cookie_cb) {                                 \
       if(SPOOL_COOKIE != *(uint32_t*) spool_cookie_addr(b)) {                                \
-        cookie_cb(PTR_TO_BLOCK(b));                                                          \
+        cookie_cb(cookie_ctx, PTR_TO_BLOCK(b));                                              \
       }                                                                                      \
     } else {                                                                                 \
       assert(SPOOL_COOKIE == *(uint32_t*) spool_cookie_addr(b));                             \
     }
+#define spool_set_debug_info(b)       (b)->file = file; (b)->line = line
 #else
 #define spool_junk(p, size)
 #define spool_set_cookie(p)
 #define spool_set_used_size(b, size)
 #define assert_cookie(b)
+#define spool_set_debug_info(b)
 #endif
 
 
 #ifndef SHTTP_DEBUG
 
 #ifdef DEBUG
-typedef void (*cookie_cb_t)(void*);
+void        *cookie_ctx;
 cookie_cb_t cookie_cb;
 #endif
 
@@ -62,7 +64,7 @@ DLL_VARIABLE void spool_init(spool_t *pool, char* p, size_t capacity) {
   pool->transacting = 0;
 }
 
-DLL_VARIABLE void *spool_malloc(spool_t *pool, size_t size) {
+DLL_VARIABLE void *spool_malloc_dbg(spool_t *pool, size_t size, const char* file, int line) {
   size_t           i, s, slot;
   spool_block_t    *block;
   char             *end;
@@ -136,6 +138,7 @@ block_lookup_end:
   spool_set_used_size(block, size);
   spool_junk(BLOCK_TO_PTR(block), size);
   spool_set_cookie(BLOCK_TO_PTR(block) + size);
+  spool_set_debug_info(block);
   return BLOCK_TO_PTR(block);
 }
 
@@ -186,10 +189,12 @@ static inline void *_spool_try_realloc(spool_t *pool, spool_block_t *block, char
 
   spool_set_used_size(block, size);
   spool_set_cookie(p + size);
+  assert(nil != block->file);
+  assert(0 != block->line);
   return p;
 }
 
-DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size) {
+DLL_VARIABLE void *spool_try_realloc_dbg(spool_t *pool, void* p, size_t size, const char* file, int line) {
   spool_block_t    *block;
 
   block = PTR_TO_BLOCK(p);
@@ -208,7 +213,7 @@ DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size) {
   return _spool_try_realloc(pool, block, (char*)p, size);
 }
 
-DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size) {
+DLL_VARIABLE void *spool_realloc_dbg(spool_t *pool, void* p, size_t size, const char* file, int line) {
   spool_block_t    *block;
   void             *new_ptr;
 
@@ -229,7 +234,7 @@ DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size) {
     return new_ptr;
   }
 
-  new_ptr = spool_malloc(pool, size);
+  new_ptr = spool_malloc_dbg(pool, size, file, line);
   if(nil == new_ptr) {
     return nil;
   }
@@ -238,7 +243,7 @@ DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size) {
   return new_ptr;
 }
 
-DLL_VARIABLE void spool_free(spool_t *pool, void *p) {
+DLL_VARIABLE void spool_free_dbg(spool_t *pool, void *p, const char* file, int line) {
   size_t           s, slot;
   spool_block_t    *block, *next,*prev;
 
@@ -294,21 +299,23 @@ DLL_VARIABLE void spool_free(spool_t *pool, void *p) {
   TAILQ_INSERT_TAIL(&pool->free_slots[slot], block, free_next);
 }
 
-DLL_VARIABLE int spool_prepare_alloc(spool_t *pool, sbuf_t *buf) {
+DLL_VARIABLE int spool_prepare_alloc_dbg(spool_t *pool, sbuf_t *buf, const char* file, int line) {
   if(0 != pool->transacting) {
     return -11;
   }
   pool->transacting = 1;
-  buf->str =BLOCK_TO_PTR( pool->start);
+  buf->str =BLOCK_TO_PTR(pool->start);
   buf->len = pool->capacity - (pool->start - pool->addr) - SPOOL_BLOCK_USED_SIZE;
+
+  spool_set_debug_info((spool_block_t*)pool->start);
   return 0;
 }
 
-DLL_VARIABLE void spool_rollback_alloc(spool_t *pool) {
+DLL_VARIABLE void spool_rollback_alloc_dbg(spool_t *pool, const char* file, int line) {
   pool->transacting = 0;
 }
 
-DLL_VARIABLE void* spool_commit_alloc(spool_t *pool, size_t size) {
+DLL_VARIABLE void* spool_commit_alloc_dbg(spool_t *pool, size_t size, const char* file, int line) {
   char          *end;
   spool_block_t *block;
 
@@ -329,6 +336,7 @@ DLL_VARIABLE void* spool_commit_alloc(spool_t *pool, size_t size) {
   block->capacity = (uint32_t)((end - (char*)block) - SPOOL_BLOCK_USED_SIZE);
   spool_set_used_size(block, size);
   spool_set_cookie(BLOCK_TO_PTR(block) + size);
+  spool_set_debug_info(block);
   TAILQ_INSERT_TAIL(&pool->all, block, all_next);
   return BLOCK_TO_PTR(block);
 }

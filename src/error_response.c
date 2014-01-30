@@ -36,7 +36,7 @@ void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
                                         size_t message_len) {
   int rc;
 
-  _shttp_response_call_hooks_for_failed(conn);
+  _shttp_response_on_completed(conn, -1);
 
   conn_outgoing(conn).body_write_buffers.array[0].base = (char*)message_str;
   conn_outgoing(conn).body_write_buffers.array[0].len = (ULONG)message_len;
@@ -65,7 +65,7 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
   char                                 *buf;
   size_t                               buf_len;
 
-  _shttp_response_call_hooks_for_failed(conn);
+  _shttp_response_on_completed(conn, -1);
 
   va_start(args, fmt);
   buf_len = strlen(fmt) + 128;

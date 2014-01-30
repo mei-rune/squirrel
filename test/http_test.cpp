@@ -40,20 +40,23 @@ TEST(http, large_headers) {
   uv_os_sock_t     sock;
   char             buf[2048];
   size_t           s;
+  int              i;
 
   WEB_INIT();
   WEB_START();
 
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  ASSERT_EQ(true, send_n(sock, GET_REQUEST, strlen(GET_REQUEST)));
-  for(s =0; s < 200; s ++) {
-    send_n(sock, "h234567890: 345678\r\n", 20);
-  }
-  send_n(sock, "\r\n", 2);
+  for(i =0; i < 3; i ++) {
+    ASSERT_EQ(true, send_n(sock, GET_REQUEST, strlen(GET_REQUEST)));
+    for(s =0; s < 200; s ++) {
+      send_n(sock, "h234567890: 345678\r\n", 20);
+    }
+    send_n(sock, "\r\n", 2);
 
-  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+    s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+    ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+    ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  }
   closesocket(sock);
 
   WEB_STOP();
@@ -87,7 +90,6 @@ TEST(http, send_error_request) {
   size_t           s;
 
   WEB_INIT();
-  
   shttp_set_log_callback(&on_log, &log_buf);
   WEB_START();
 
@@ -204,15 +206,19 @@ TEST(http, end_not_call_with_not_thunked) {
   size_t           s;
 
   WEB_INIT();
+  shttp_set_log_callback(&on_log, &log_buf);
   settings.callbacks.on_message_complete = &on_message_complete_not_thunked;
   WEB_START();
 
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
-  s = max_recv(sock, buf, 2048, 2);
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, strlen(BODY_NOT_COMPLETE));
   ASSERT_EQ(0, strcmp(buf, BODY_NOT_COMPLETE));
   closesocket(sock);
+
+  log_buf.str[log_buf.len] = 0;
+  ASSERT_STREQ("callback: chunked must is true while body is not completed.", log_buf.str);
 
   WEB_STOP();
 }

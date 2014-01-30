@@ -32,7 +32,7 @@ extern "C" {
 
 #define copy_content_type(conn, txt, txt_len)                                       \
   if(txt_len > conn_outgoing(conn).content_type.len) {                              \
-    if(nil == conn_outgoing(conn).content_type.len) {                               \
+    if(0 == conn_outgoing(conn).content_type.len) {                               \
       conn_outgoing(conn).content_type.len = sl_max(128, txt_len);                  \
       conn_outgoing(conn).content_type.str = (char*)conn_response_malloc(conn,      \
                                                      sl_max(128, txt_len));         \
@@ -511,6 +511,7 @@ static shttp_res _shttp_response_send_predefine_headers(shttp_connection_interna
   }
 
   spool_commit_alloc(conn_response_pool(conn), res + status_code->len + SHTTP_CRLF_LEN);
+  CALL_AFTER(conn, completed, &shttp_response_pool_free, buf.str);
   return SHTTP_RES_OK;
 failed:
   spool_rollback_alloc(conn_response_pool(conn), &buf);
@@ -573,6 +574,21 @@ DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *external) {
   return SHTTP_RES_OK;
 }
 
+void _shttp_response_on_completed(shttp_connection_internal_t *conn, int status) {
+  assert((0 == status)? true : (SHTTP_RES_OK != conn_outgoing(conn).failed_code));
+  conn_outgoing(conn).head_write_buffers.length = 0;
+  conn_outgoing(conn).body_write_buffers.length = 0;
+
+  _shttp_response_call_hooks_after_writed(conn);
+  _shttp_response_call_hooks_after_completed(conn);
+
+  _shttp_response_assert_after_response_end(conn);
+
+  if(nil != conn_outgoing(conn).content_type.str) {
+    conn_response_free(conn, conn_outgoing(conn).content_type.str);
+  }
+}
+
 void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
                                      uv_close_cb on_disconnect,
                                      uv_write_cb on_head_writed,
@@ -629,7 +645,7 @@ void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
   ERR("write: %s", uv_strerror(rc));
 failed:
   conn_outgoing(conn).failed_code = rc;
-  _shttp_response_call_hooks_for_failed(conn);
+  _shttp_response_on_completed(conn, -1);
   uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
   return;
 }

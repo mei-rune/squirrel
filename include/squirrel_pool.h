@@ -46,7 +46,10 @@ typedef struct spool_block_s {
   uint32_t                    used_size;
 #endif
   uint32_t                    capacity;
-
+#ifdef DEBUG
+  const char                  *file;
+  int                         line;
+#endif
   TAILQ_ENTRY(spool_block_s) all_next;
   TAILQ_ENTRY(spool_block_s) free_next;
 } spool_block_t;
@@ -82,20 +85,29 @@ typedef struct spool_s {
 } spool_t;
 
 DLL_VARIABLE void spool_init(spool_t *pool, char* p, size_t capacity);
-DLL_VARIABLE void *spool_malloc(spool_t *pool, size_t size);
-DLL_VARIABLE void *spool_try_realloc(spool_t *pool, void* p, size_t size);
-DLL_VARIABLE void *spool_realloc(spool_t *pool, void* p, size_t size);
-DLL_VARIABLE void spool_free(spool_t *pool, void *p);
+DLL_VARIABLE void *spool_malloc_dbg(spool_t *pool, size_t size, const char* file, int line);
+DLL_VARIABLE void *spool_try_realloc_dbg(spool_t *pool, void* p, size_t size, const char* file, int line);
+DLL_VARIABLE void *spool_realloc_dbg(spool_t *pool, void* p, size_t size, const char* file, int line);
+DLL_VARIABLE void spool_free_dbg(spool_t *pool, void *p, const char* file, int line);
 
 typedef sstring_t sbuf_t;
-DLL_VARIABLE int  spool_prepare_alloc(spool_t *pool, sbuf_t *buf);
-DLL_VARIABLE void spool_rollback_alloc(spool_t *pool);
-DLL_VARIABLE void *spool_commit_alloc(spool_t *pool, size_t length);
+DLL_VARIABLE int  spool_prepare_alloc_dbg(spool_t *pool, sbuf_t *buf, const char* file, int line);
+DLL_VARIABLE void spool_rollback_alloc_dbg(spool_t *pool, const char* file, int line);
+DLL_VARIABLE void *spool_commit_alloc_dbg(spool_t *pool, size_t length, const char* file, int line);
 DLL_VARIABLE void spool_stat(spool_t *pool);
 
+#define spool_malloc(pool, size)               spool_malloc_dbg(pool, size, __FILE__, __LINE__)
+#define spool_try_realloc(pool, p, size)       spool_try_realloc_dbg(pool, p, size, __FILE__, __LINE__)
+#define spool_realloc(pool, p, size)           spool_realloc_dbg(pool, p, size, __FILE__, __LINE__)
+#define spool_free(pool, p)                    spool_free_dbg(pool, p, __FILE__, __LINE__)
+#define spool_prepare_alloc(pool, buf)         spool_prepare_alloc_dbg(pool, buf, __FILE__, __LINE__)
+#define spool_rollback_alloc(pool, buf)        spool_rollback_alloc_dbg(pool, __FILE__, __LINE__)
+#define spool_commit_alloc(pool, length)       spool_commit_alloc_dbg(pool, length, __FILE__, __LINE__)
+
 #ifdef DEBUG
-typedef void (*cookie_cb_t)(void*);
+typedef void (*cookie_cb_t)(void* ctx, void* block);
 extern cookie_cb_t cookie_cb;
+extern void* cookie_ctx;
 #endif
 
 #endif

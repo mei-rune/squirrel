@@ -46,6 +46,27 @@ end:
 }
 
 #ifdef DEBUG
+static inline void _shttp_connection_memory_check(shttp_connection_internal_t* conn) {
+  spool_block_t               *block;
+
+  if(nil != conn->rd_buf.s) {
+    spool_free(&conn->pool, conn->rd_buf.s);
+  }
+  if(nil != conn->incomming.headers_block &&
+      conn->rd_buf.s != conn->incomming.headers_block) {
+    spool_free(&conn->pool, conn->incomming.headers_block);
+  }
+
+  if(!TAILQ_EMPTY(&conn->pool.all)) {
+    ERR("detect mem leaks:");
+    TAILQ_FOREACH(block, &conn->pool.all, all_next) {
+      if(block->used) {
+        ERR("mem: %s(%d)", block->file, block->line);
+      }
+    }
+  }
+}
+
 static inline void _shttp_connection_assert(shttp_t* http, shttp_connection_internal_t* conn) {
   assert(conn_external(conn).http == http);
   assert(conn_external(conn).internal == conn);
@@ -77,6 +98,7 @@ static inline void _shttp_connection_assert_external(shttp_t* http, shttp_connec
   assert(0 == conn_outgoing(conn).head_buffer.capacity);
 }
 #else
+#define _shttp_connection_memory_check(conn)
 #define _shttp_connection_assert(http, conn)
 #define _shttp_connection_assert_external(http, conn)
 #endif
@@ -130,7 +152,7 @@ static inline void _shttp_connection_parse_request_first(shttp_connection_intern
   _shttp_connection_parse_request(conn, base, len, nread);
 }
 
-static inline void _shttp_connection_on_request_completed(shttp_connection_internal_t* conn) {
+static inline void _shttp_connection_restart_read_request(shttp_connection_internal_t* conn) {
   int               rc;
 
   http_parser_pause(&conn->parser, 0);
@@ -154,6 +176,11 @@ static inline void _shttp_connection_on_request_completed(shttp_connection_inter
     }
 
   } else {
+#ifdef DEBUG
+    _shttp_connection_memory_check(conn);
+    conn->rd_buf.s = (char*)spool_malloc(&conn->pool, spool_excepted(2*1024));
+    conn->rd_buf.capacity = spool_excepted(2*1024);
+#endif
     conn->rd_buf.end = 0;
     conn->rd_buf.start = 0;
   }
@@ -169,10 +196,12 @@ static inline void _shttp_connection_on_request_completed(shttp_connection_inter
 
 static void _shttp_connection_on_disconnect(uv_handle_t* handle) {
   shttp_connection_internal_t *conn;
-  shttp_t            *http;
+  shttp_t                     *http;
 
   conn = (shttp_connection_internal_t*)handle->data;
   http = conn_external(conn).http;
+
+  _shttp_connection_memory_check(conn);
 
   TAILQ_REMOVE(&http->connections, conn, next);
   TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
@@ -185,7 +214,7 @@ static void _shttp_connection_on_head_writed(uv_write_t* req, int status) {
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
     conn_outgoing(conn).failed_code = SHTTP_RES_UV;
-    _shttp_response_call_hooks_for_failed(conn);
+    _shttp_response_on_completed(conn, -1);
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return;
   }
@@ -203,21 +232,18 @@ static void _shttp_connection_on_data_writed(uv_write_t* req, int status) {
   if (status < 0) {
     ERR("write: %s", uv_strerror(status));
     conn_outgoing(conn).failed_code = SHTTP_RES_UV;
-    _shttp_response_call_hooks_for_failed(conn);
+    _shttp_response_on_completed(conn, -1);
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return;
   }
 
-  conn_outgoing(conn).body_write_buffers.length = 0;
   if(0 != conn_outgoing(conn).is_body_end) {
-    _shttp_response_call_hooks_after_writed(conn);
-    _shttp_response_call_hooks_after_completed(conn);
-    _shttp_response_assert_after_response_end(conn);
-
-    _shttp_connection_on_request_completed(conn);
+    _shttp_response_on_completed(conn, 0);
+    _shttp_connection_restart_read_request(conn);
     return;
   }
 
+  conn_outgoing(conn).body_write_buffers.length = 0;
   _shttp_response_call_hooks_after_writed(conn);
 
   _shttp_response_send_ready_data(conn,
@@ -271,7 +297,7 @@ int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
   if(0 != res) {
     ERR("callback: result of callback is %d.", res);
     conn_outgoing(conn).failed_code = res;
-    _shttp_response_call_hooks_for_failed(conn);
+    _shttp_response_on_completed(conn, -1);
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return 0;
   }
