@@ -4,7 +4,13 @@
 
 const char *simple_request= GET_REQUEST "\r\n";
 const char *pipeline_requests= GET_REQUEST "\r\n" GET_REQUEST "\r\n";
-const char *HELLO_WORLD_RESPONSE = "HTTP/1.1 200 OK\r\nabc: abc\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nContent-Length: 40\r\n\r\n<html><body>HELLO WORLD!!!</body></html>";
+const char *HELLO_WORLD_RESPONSE = "HTTP/1.1 200 OK\r\n"
+                                   "abc: abc\r\n"
+                                   "Connection: keep-alive\r\n"
+                                   "Content-Type: text/html\r\n"
+                                   "Content-Length: 40\r\n"
+                                   "\r\n"
+                                   "<html><body>HELLO WORLD!!!</body></html>";
 cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
 
 TEST(http, create_and_free) {
@@ -75,7 +81,8 @@ TEST(http, pipeline_request) {
   ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE), HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE),
+                        HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
   closesocket(sock);
 
   WEB_STOP();
@@ -94,7 +101,9 @@ TEST(http, send_error_request) {
   WEB_START();
 
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  ASSERT_EQ(true, send_n(sock, "1234567890" GET_REQUEST "123\r\n\r\n", strlen(GET_REQUEST) + 17));
+  ASSERT_EQ(true, send_n(sock,
+                         "1234567890" GET_REQUEST "123\r\n\r\n",
+                         strlen(GET_REQUEST) + 17));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, 0);
   closesocket(sock);
@@ -120,7 +129,8 @@ TEST(http, pipeline_request_while_two_read) {
 
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE), HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE),
+                        HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
   closesocket(sock);
 
   WEB_STOP();
