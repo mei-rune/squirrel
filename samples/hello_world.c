@@ -12,7 +12,7 @@ typedef struct usr_context_s {
 } usr_context_t;
 
 
-void on_log(int severity, const char *fmt, va_list ap) {
+void on_log(void* ctx, int severity, const char *fmt, va_list ap) {
   _vscprintf(fmt, ap);
   printf("\r\n");
 }
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 
   memset(&settings, 0, sizeof(shttp_settings_t));
   settings.user_ctx_size = sizeof(usr_context_t);
-  shttp_set_log_callback(&on_log);
+  shttp_set_log_callback(&on_log, nil);
 
   settings.callbacks.on_message_begin = &on_message_begin;
   settings.callbacks.on_body = &on_body;

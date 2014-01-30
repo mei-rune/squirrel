@@ -18,14 +18,14 @@
 extern "C" {
 #endif
 
-#define CHECK(condition)                                                         \
-  do {                                                                           \
-    if (!(condition)) {                                                          \
-      LOG_PRINTF_2("Check failed: " #condition " at %s(%d)\n"                    \
-                               , __FILE__, __LINE__);                            \
-      abort();                                                                   \
-      exit(1);                                                                   \
-    }                                                                            \
+#define CHECK(condition)                                                          \
+  do {                                                                            \
+    if (!(condition)) {                                                           \
+      LOG_PRINTF_2("Check failed: " #condition " at %s(%d)\n"                     \
+                               , __FILE__, __LINE__);                             \
+      abort();                                                                    \
+      exit(-1);                                                                   \
+    }                                                                             \
   } while (0)
 
 
@@ -35,7 +35,7 @@ extern "C" {
       LOG_PRINTF_2("Check failed: " #condition ": " message " at %s(%d)\n"        \
                                , __FILE__, __LINE__);                             \
       abort();                                                                    \
-      exit(1);                                                                    \
+      exit(-1);                                                                   \
     }                                                                             \
   } while (0)
 
@@ -46,7 +46,7 @@ extern "C" {
      LOG_PRINTF_3("Check failed: " #condition ": %s at %s(%d)\n"                  \
                          , strerror(errno), __FILE__, __LINE__);                  \
       abort();                                                                    \
-      exit(1);                                                                    \
+      exit(-1);                                                                   \
     }                                                                             \
   } while (0)
 
@@ -56,7 +56,7 @@ extern "C" {
       LOG_PRINTF_2("Check failed: " #val1 #op #val2 " at %s, %d\n"                \
                         , __FILE__, __LINE__ );                                   \
       abort();                                                                    \
-      exit(1);                                                                    \
+      exit(-1);                                                                   \
     }                                                                             \
   } while (0)
 

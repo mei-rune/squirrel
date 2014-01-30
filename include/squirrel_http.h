@@ -431,7 +431,7 @@ DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
 
   @see event_set_log_callback
  */
-typedef void (*shttp_log_cb_t)(int severity, const char *fmt, va_list ap);
+typedef void (*shttp_log_cb_t)(void* ctx, int severity, const char *fmt, va_list ap);
 
 /**
   Redirect shttp's log messages.
@@ -443,7 +443,7 @@ typedef void (*shttp_log_cb_t)(int severity, const char *fmt, va_list ap);
   NOTE: The function you provide *must not* call any other shttp
   functionality.  Doing so can produce undefined behavior.
   */
-DLL_VARIABLE void shttp_set_log_callback(shttp_log_cb_t cb);
+DLL_VARIABLE void shttp_set_log_callback(shttp_log_cb_t cb, void* ctx);
 /**@}*/
 
 #ifdef __cplusplus
