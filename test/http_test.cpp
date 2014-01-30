@@ -18,9 +18,9 @@ static void startup(void) {
 }
 
 enum select_mode {
-  select_read = 1
-                , select_write = 2
-                                 , select_error = 4
+  select_read  = 1,
+  select_write = 2,
+  select_error = 4
 };
 
 bool socket_set_option (uv_os_sock_t sock,
@@ -169,7 +169,7 @@ bool recv_n(uv_os_sock_t sock, char* buf, size_t length) {
 //}
 
 
-size_t max_recv(uv_os_sock_t sock, char* raw, size_t raw_len, int timeout) {
+size_t max_recv(uv_os_sock_t sock, char* simple_request, size_t simple_request_len, int timeout) {
   size_t recv_size = 0;
   int n;
   TIMEVAL time_val;
@@ -178,12 +178,12 @@ size_t max_recv(uv_os_sock_t sock, char* raw, size_t raw_len, int timeout) {
   time_val.tv_usec = 0;
 
   while(socket_poll(sock, time_val, select_read )) {
-    n = recv(sock, raw + recv_size, (int)(raw_len - recv_size), 0);
+    n = recv(sock, simple_request + recv_size, (int)(simple_request_len - recv_size), 0);
     if(0 >= n) {
       break;
     }
     recv_size += n;
-    raw[recv_size] =0;
+    simple_request[recv_size] =0;
   }
   return recv_size;
 }
@@ -210,36 +210,19 @@ static uv_os_sock_t create_tcp_socket(void) {
   return sock;
 }
 
-const char * raw= "GET /favicon.ico HTTP/1.1\r\n"
-                  "Host: 0.0.0.0=5000\r\n"
-                  "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
-                  "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-                  "Accept-Language: en-us,en;q=0.5\r\n"
-                  "Accept-Encoding: gzip,deflate\r\n"
-                  "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
-                  "Keep-Alive: 300\r\n"
+#define GET_REQUEST "GET /favicon.ico HTTP/1.1\r\n" \
+                  "Host: 0.0.0.0=5000\r\n"          \
+                  "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n" \
+                  "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"                  \
+                  "Accept-Language: en-us,en;q=0.5\r\n"                                                          \
+                  "Accept-Encoding: gzip,deflate\r\n"                                                            \
+                  "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"                                           \
+                  "Keep-Alive: 300\r\n"                                                                          \
                   "Connection: keep-alive\r\n"
-                  "\r\n";
 
-const char * pipeline_raw= "GET /favicon.ico HTTP/1.1\r\n"
-                           "Host: 0.0.0.0=5000\r\n"
-                           "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
-                           "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-                           "Accept-Language: en-us,en;q=0.5\r\n"
-                           "Accept-Encoding: gzip,deflate\r\n"
-                           "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
-                           "Keep-Alive: 300\r\n"
-                           "Connection: keep-alive\r\n"
-                           "\r\n""GET /favicon.ico HTTP/1.1\r\n"
-                           "Host: 0.0.0.0=5000\r\n"
-                           "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n"
-                           "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-                           "Accept-Language: en-us,en;q=0.5\r\n"
-                           "Accept-Encoding: gzip,deflate\r\n"
-                           "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\r\n"
-                           "Keep-Alive: 300\r\n"
-                           "Connection: keep-alive\r\n"
-                           "\r\n";
+const char * simple_request= GET_REQUEST "\r\n";
+
+const char * pipeline_requests= GET_REQUEST "\r\n" GET_REQUEST "\r\n";
 
 #define HELLO_WORLD "<html><body>HELLO WORLD!!!</body></html>"
 
@@ -366,150 +349,135 @@ TEST(http, create_and_free) {
 }
 
 TEST(http, simple) {
-  shttp_settings_t settings;
-  shttp_t          *srv;
-  shttp_res        rc;
-  uv_thread_t      tid;
+  WEB_DECL();
   uv_os_sock_t     sock;
   char             buf[2048];
   size_t           s;
 
-  memset(&settings, 0, sizeof(shttp_settings_t));
-  settings.user_ctx_size = sizeof(usr_context_t);
-  shttp_set_log_callback(&on_log);
+  WEB_INIT();
+  WEB_START();
 
-  settings.callbacks.on_message_begin = &on_message_begin;
-  settings.callbacks.on_body = &on_body;
-  settings.callbacks.on_message_complete = &on_message_complete;
-  srv = shttp_create(&settings);
-  ASSERT_NE(nil, srv);
-  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_create(&tid, &start_web, srv);
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
   ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
   closesocket(sock);
 
-  rc = shttp_shutdown(srv);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_join(&tid);
-  shttp_free(srv);
+  WEB_STOP();
+}
+
+
+TEST(http, large_headers) {
+  // large_headers will realloc memory while reading headers, and relocate buffers
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, GET_REQUEST, strlen(GET_REQUEST)));
+  for(s =0; s < 200; s ++) {
+    send_n(sock, "h234567890: 345678\r\n", 20);
+  }
+  send_n(sock, "\r\n", 2);
+
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
 }
 
 TEST(http, pipeline_request) {
-  shttp_settings_t settings;
-  shttp_t          *srv;
-  shttp_res        rc;
-  uv_thread_t      tid;
+  WEB_DECL();
   uv_os_sock_t     sock;
   char             buf[2048];
   size_t           s;
 
-  memset(&settings, 0, sizeof(shttp_settings_t));
-  settings.user_ctx_size = sizeof(usr_context_t);
-  shttp_set_log_callback(&on_log);
+  WEB_INIT();
+  WEB_START();
 
-  settings.callbacks.on_message_begin = &on_message_begin;
-  settings.callbacks.on_body = &on_body;
-  settings.callbacks.on_message_complete = &on_message_complete;
-  srv = shttp_create(&settings);
-  ASSERT_NE(nil, srv);
-  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_create(&tid, &start_web, srv);
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  ASSERT_EQ(true, send_n(sock, pipeline_raw, strlen(pipeline_raw)));
+  ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE + strlen(HELLO_WORLD_RESPONSE), strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE), HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
   closesocket(sock);
 
-  rc = shttp_shutdown(srv);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_join(&tid);
-  shttp_free(srv);
+  WEB_STOP();
+}
+
+TEST(http, pipeline_request_while_two_read) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)-12));
+  ASSERT_EQ(true, send_n(sock, pipeline_requests + (strlen(pipeline_requests)-12), 12));
+
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE), HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  closesocket(sock);
+
+  WEB_STOP();
 }
 
 TEST(http, reuse_connect) {
-  shttp_settings_t settings;
-  shttp_t          *srv;
-  shttp_res        rc;
-  uv_thread_t      tid;
+  WEB_DECL();
   uv_os_sock_t     sock;
   char             buf[2048];
   size_t           s;
 
-  memset(&settings, 0, sizeof(shttp_settings_t));
-  settings.user_ctx_size = sizeof(usr_context_t);
-  shttp_set_log_callback(&on_log);
 
-  settings.callbacks.on_message_begin = &on_message_begin;
-  settings.callbacks.on_body = &on_body;
-  settings.callbacks.on_message_complete = &on_message_complete;
-  srv = shttp_create(&settings);
-  ASSERT_NE(nil, srv);
-  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_create(&tid, &start_web, srv);
-
+  WEB_INIT();
+  WEB_START();
 
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-
-
-  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
   ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
 
 
-  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
   ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
 
   closesocket(sock);
 
-  rc = shttp_shutdown(srv);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_join(&tid);
-  shttp_free(srv);
+
+  WEB_STOP();
 }
 
 TEST(http, muti_write) {
-  shttp_settings_t settings;
-  shttp_t          *srv;
-  shttp_res        rc;
-  uv_thread_t      tid;
+  WEB_DECL();
   uv_os_sock_t     sock;
   char             buf[2048];
   size_t           s;
 
-  memset(&settings, 0, sizeof(shttp_settings_t));
-  settings.user_ctx_size = sizeof(usr_context_t);
-  shttp_set_log_callback(&on_log);
+  WEB_INIT();
+  WEB_START();
 
-  settings.callbacks.on_message_begin = &on_message_begin;
-  settings.callbacks.on_body = &on_body;
-  settings.callbacks.on_message_complete = &on_message_complete_muti_write;
-  srv = shttp_create(&settings);
-  ASSERT_NE(nil, srv);
-  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_create(&tid, &start_web, srv);
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
   ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
   closesocket(sock);
 
-  rc = shttp_shutdown(srv);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_join(&tid);
-  shttp_free(srv);
+  WEB_STOP();
 }
 
 void on_message_send (shttp_connection_t* conn, void *act) {
@@ -539,35 +507,21 @@ int on_message_complete_not_thunked(shttp_connection_t* conn) {
 
 
 TEST(http, end_not_call_with_not_thunked) {
-  shttp_settings_t settings;
-  shttp_t          *srv;
-  shttp_res        rc;
-  uv_thread_t      tid;
+  WEB_DECL();
   uv_os_sock_t     sock;
   char             buf[2048];
   size_t           s;
 
-  memset(&settings, 0, sizeof(shttp_settings_t));
-  settings.user_ctx_size = sizeof(usr_context_t);
-  shttp_set_log_callback(&on_log);
-
-  settings.callbacks.on_message_begin = &on_message_begin;
-  settings.callbacks.on_body = &on_body;
+  WEB_INIT();
   settings.callbacks.on_message_complete = &on_message_complete_not_thunked;
-  srv = shttp_create(&settings);
-  ASSERT_NE(nil, srv);
-  rc = shttp_listen_at(srv, "tcp4", "0.0.0.0", TEST_PORT);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_create(&tid, &start_web, srv);
+  WEB_START();
+
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  ASSERT_EQ(true, send_n(sock, raw, strlen(raw)));
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, 2);
   ASSERT_EQ( s, strlen(BODY_NOT_COMPLETE));
   ASSERT_EQ(0, strcmp(buf, BODY_NOT_COMPLETE));
   closesocket(sock);
 
-  rc = shttp_shutdown(srv);
-  ASSERT_EQ(SHTTP_RES_OK, rc);
-  uv_thread_join(&tid);
-  shttp_free(srv);
+  WEB_STOP();
 }

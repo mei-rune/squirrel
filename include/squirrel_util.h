@@ -58,7 +58,11 @@ typedef int boolean;
 #endif
 
 #ifndef nil
+#ifdef NULL
+#define nil NULL
+#else
 #define nil 0
+#endif
 #endif
 
 #define sl_max(x,y) (((x) > (y))?(x):(y))

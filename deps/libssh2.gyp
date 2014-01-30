@@ -78,7 +78,7 @@
       ],
     }, # end libssh2
     {
-      'target_name': 'libssh2_test',
+      'target_name': 'libssh2_simple',
       'type': 'executable',
       'sources': [ 'libssh2/tests/simple.c' ],
       'dependencies': [
@@ -97,5 +97,145 @@
         }],
       ],
     }, # end libssh2_test		
+    {
+      'target_name': 'libssh2_test',
+      'type': 'executable',
+      'sources': [ 'libssh2/tests/ssh2.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end libssh2_test
+    {
+      'target_name': 'ssh2',
+      'type': 'executable',
+      'sources': [ 'libssh2/example/ssh2.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end ssh2
+    {
+      'target_name': 'ssh2_agent',
+      'type': 'executable',
+      'sources': [ 'libssh2/example/ssh2_agent.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end ssh2_agent
+    {
+      'target_name': 'ssh2_echo',
+      'type': 'executable',
+      'sources': [ 'libssh2/example/ssh2_echo.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end ssh2_echo
+    {
+      'target_name': 'ssh2_exec',
+      'type': 'executable',
+      'sources': [ 'libssh2/example/ssh2_exec.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end ssh2_exec
+    {
+      'target_name': 'ssh2-tcpip-forward',
+      'type': 'executable',
+      'sources': [ 'libssh2/example/tcpip-forward.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end ssh2-tcpip-forward
+    {
+      'target_name': 'ssh2-direct_tcpip',
+      'type': 'executable',
+      'sources': [ 'libssh2/example/direct_tcpip.c' ],
+      'dependencies': [
+        'libssh2'
+      ],
+     'link_settings': {
+       'libraries': [
+			'-ladvapi32.lib',
+			'-lws2_32.lib'
+        ],
+      },
+      'conditions': [
+        ['OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris"', {
+          'cflags': [ '--std=c89' ],
+          'defines': [ '_GNU_SOURCE' ]
+        }],
+      ],
+    }, # end ssh2-direct_tcpip
   ] # end targets
 }

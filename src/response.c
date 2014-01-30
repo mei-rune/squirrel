@@ -484,6 +484,7 @@ static shttp_res _shttp_response_send_predefine_headers(shttp_connection_interna
                   sbuffer_length(conn_outgoing(conn).head_buffer));
   sbuffer_zero(conn_outgoing(conn).head_buffer);
 
+
   res = spool_prepare_alloc(conn_response_pool(conn), &buf);
   if(SHTTP_RES_OK != res) {
     return res;
@@ -512,7 +513,7 @@ static shttp_res _shttp_response_send_predefine_headers(shttp_connection_interna
   spool_commit_alloc(conn_response_pool(conn), res + status_code->len + SHTTP_CRLF_LEN);
   return SHTTP_RES_OK;
 failed:
-  spool_rollback_alloc(conn_response_pool(conn));
+  spool_rollback_alloc(conn_response_pool(conn), &buf);
   return SHTTP_RES_MEMORY;
 }
 

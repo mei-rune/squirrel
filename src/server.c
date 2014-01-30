@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 void _shttp_parser_init(struct http_parser_settings *parser_settings);
-void _shttp_on_connect(uv_stream_t* server_handle, int status);
+void _shttp_connection_on_connect(uv_stream_t* server_handle, int status);
 
 /*****************************************************************************
  * HTTP Server API
@@ -133,7 +133,6 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
                                          http->settings.user_ctx_size, shttp_pagesize) +
                        (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count);
     conn->arena_capacity = http->settings.rw_buffer_size;
-    conn->arena_offset = 0;
 
     TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
   }
@@ -188,7 +187,7 @@ DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char 
   rc = uv_tcp_bind(&listening->uv_handle, addr, 0);
   UV_CHECK(rc, http->uv_loop, "bind");
 
-  rc = uv_listen((uv_stream_t*)&listening->uv_handle, 128, &_shttp_on_connect);
+  rc = uv_listen((uv_stream_t*)&listening->uv_handle, 128, &_shttp_connection_on_connect);
   UV_CHECK(rc, http->uv_loop, "listening");
 
   TAILQ_INSERT_TAIL(&http->listenings, listening, next);

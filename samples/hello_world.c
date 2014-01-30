@@ -14,6 +14,7 @@ typedef struct usr_context_s {
 
 void on_log(int severity, const char *fmt, va_list ap) {
   _vscprintf(fmt, ap);
+  printf("\r\n");
 }
 
 int  on_message_begin (shttp_connection_t* conn) {
@@ -24,22 +25,22 @@ int  on_body (shttp_connection_t* conn, const char *at, size_t length) {
   return 0;
 }
 
-void on_message_send (shttp_connection_t* conn, void *act) {
-  usr_context_t       *ctx;
-
-  ctx = (usr_context_t*)act;
-
-  switch(ctx->status) {
-  case 0:
-    shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
-    shttp_response_write_header(conn, "abc", 3, "abc", 3);
-    shttp_response_write(conn, HTTP_HELLO_WORLD.str, HTTP_HELLO_WORLD.len-3, &on_message_send, act);
-  case 1:
-    shttp_response_write(conn, HTTP_HELLO_WORLD.str - (HTTP_HELLO_WORLD.len-3), 3, &on_message_send, act);
-  case 2:
-    shttp_response_end(conn);
-  }
-}
+//void on_message_send (shttp_connection_t* conn, void *act) {
+//  usr_context_t       *ctx;
+//
+//  ctx = (usr_context_t*)act;
+//
+//  switch(ctx->status) {
+//  case 0:
+//    shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+//    shttp_response_write_header(conn, "abc", 3, "abc", 3);
+//    shttp_response_write(conn, HTTP_HELLO_WORLD.str, HTTP_HELLO_WORLD.len-3, &on_message_send, act);
+//  case 1:
+//    shttp_response_write(conn, HTTP_HELLO_WORLD.str - (HTTP_HELLO_WORLD.len-3), 3, &on_message_send, act);
+//  case 2:
+//    shttp_response_end(conn);
+//  }
+//}
 
 int  on_message_complete (shttp_connection_t* conn) {
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);

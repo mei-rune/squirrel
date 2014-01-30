@@ -3,6 +3,7 @@
 #include "squirrel_pool.h"
 #include "squirrel_test.h"
 
+#ifndef SHTTP_DEBUG
 void *spool_test_realloc(spool_t *pool, void* p, size_t size) {
   void *c = spool_realloc(pool, p, size);
   memset(c, '4', size);
@@ -795,3 +796,5 @@ TEST(pool, transaction) {
   }
   free(mem);
 }
+
+#endif

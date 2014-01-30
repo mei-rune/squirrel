@@ -9,14 +9,11 @@
 extern "C" {
 #endif
 
-int _shttp_connection_on_message_begin(shttp_connection_internal_t*);
-int _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn);
-int _shttp_connection_on_body (shttp_connection_internal_t*, const char *at, size_t length);
-int _shttp_connection_on_message_complete (shttp_connection_internal_t*);
-
 static int _http_request_on_message_begin(http_parser* inner) {
   shttp_connection_internal_t* conn;
+
   conn = (shttp_connection_internal_t*)inner->data;
+  assert(shttp_message_request_parse_none == conn->status);
   conn->status = shttp_message_request_parse_begin;
   return _shttp_connection_on_message_begin(conn);
 }
@@ -69,34 +66,34 @@ static int _parse_url(shttp_connection_internal_t* conn) {
 
 #define http_uri conn_request(conn).uri
 
-  sstring_init(&http_uri.full, data.str, data.len);
-  sstring_init(&http_uri.schema,
+  sstring_init(http_uri.full, data.str, data.len);
+  sstring_init(http_uri.schema,
                data.str + parse_url.field_data[UF_SCHEMA].off,
                parse_url.field_data[UF_SCHEMA].len);
 
-  sstring_init(&http_uri.host,
+  sstring_init(http_uri.host,
                data.str + parse_url.field_data[UF_HOST].off,
                parse_url.field_data[UF_HOST].len);
 
-  sstring_init(&http_uri.port_s,
+  sstring_init(http_uri.port_s,
                data.str + parse_url.field_data[UF_PORT].off,
                parse_url.field_data[UF_PORT].len);
 
   http_uri.port_i = parse_url.port;
 
-  sstring_init(&http_uri.path,
+  sstring_init(http_uri.path,
                data.str + parse_url.field_data[UF_PATH].off,
                parse_url.field_data[UF_PATH].len);
 
-  sstring_init(&http_uri.query,
+  sstring_init(http_uri.query,
                data.str + parse_url.field_data[UF_QUERY].off,
                parse_url.field_data[UF_QUERY].len);
 
-  sstring_init(&http_uri.fragment,
+  sstring_init(http_uri.fragment,
                data.str + parse_url.field_data[UF_FRAGMENT].off,
                parse_url.field_data[UF_FRAGMENT].len);
 
-  sstring_init(&http_uri.user_info,
+  sstring_init(http_uri.user_info,
                data.str + parse_url.field_data[UF_USERINFO].off,
                parse_url.field_data[UF_USERINFO].len);
   return 0;
@@ -172,7 +169,7 @@ static int _http_request_on_headers_complete(http_parser* inner) {
   int                          rc;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  conn->status = shttp_message_request_parse_body;
+  conn->status = shttp_message_request_parse_headers_ok;
 
   conn_request(conn).headers.array = conn_incomming(conn).headers.array;
   conn_request(conn).headers.length = conn_incomming(conn).headers.length;
@@ -192,7 +189,9 @@ static int _http_request_on_body(http_parser *inner, const char *at, size_t leng
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  assert(conn->status == shttp_message_request_parse_body);
+  assert(shttp_message_request_parse_body == conn->status ||
+         shttp_message_request_parse_headers_ok == conn->status);
+  conn->status = shttp_message_request_parse_body;
   return _shttp_connection_on_body(conn, at, length);
 }
 
@@ -200,7 +199,8 @@ static int _http_request_on_message_complete(http_parser* inner) {
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  assert(shttp_message_request_parse_body == conn->status);
+  assert(shttp_message_request_parse_body == conn->status ||
+         shttp_message_request_parse_headers_ok == conn->status);
   conn->status = shttp_message_request_parse_end;
   return _shttp_connection_on_message_complete(conn);
 }

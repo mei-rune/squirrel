@@ -33,13 +33,13 @@ extern "C" {
 #endif
 
 typedef struct shttp_listening_s {
-  shttp_t                               *http;
-  uv_tcp_t                              uv_handle;
+  shttp_t                                 *http;
+  uv_tcp_t                                uv_handle;
 
-  sstring_t                             net;
-  sstring_t                             address;
+  sstring_t                               net;
+  sstring_t                               address;
 
-  TAILQ_ENTRY(shttp_listening_s)        next;
+  TAILQ_ENTRY(shttp_listening_s)          next;
 } shttp_listening_t;
 
 TAILQ_HEAD(shttp_listenings, shttp_listening_s);
@@ -47,58 +47,72 @@ typedef struct shttp_listenings shttp_listenings_t;
 
 
 typedef enum shttp_message_request_parse_status_e {
-  shttp_message_request_parse_begin      = 0,
-  shttp_message_request_parse_status     = 1,
-  shttp_message_request_parse_url        = 2,
-  shttp_message_request_parse_field      = 3,
-  shttp_message_request_parse_value      = 4,
-  shttp_message_request_parse_body       = 5,
-  shttp_message_request_parse_end        = 6,
-  shttp_message_response_begin           = 7,
-  shttp_message_response_writing         = 8,
-  shttp_message_response_end             = 9,
+  shttp_message_request_parse_none        = 0,
+  shttp_message_request_parse_begin       = 1,
+  shttp_message_request_parse_status      = 2,
+  shttp_message_request_parse_url         = 3,
+  shttp_message_request_parse_field       = 4,
+  shttp_message_request_parse_value       = 5,
+  shttp_message_request_parse_headers_ok  = 6,
+  shttp_message_request_parse_body        = 7,
+  shttp_message_request_parse_end         = 8,
+  shttp_message_response_begin            = 9,
+  shttp_message_response_writing          = 10,
+  shttp_message_response_end              = 11,
 
-
-
-  shttp_message_failed                   = 255
+  shttp_message_failed                    = 255
 } shttp_message_request_parse_status_t;
 
-#define shttp_write_buffers_size    32
-#define shttp_head_write_buffers_size shttp_write_buffers_size
-#define shttp_body_write_buffers_size shttp_write_buffers_size
-#define shttp_write_cb_buffers_size (2*shttp_write_buffers_size)
+
+#define shttp_headers_is_reading(conn)  (shttp_message_request_parse_headers_ok > conn->status)
+
+
+#define shttp_write_buffers_size          32
+#define shttp_head_write_buffers_size     shttp_write_buffers_size
+#define shttp_body_write_buffers_size     shttp_write_buffers_size
+#define shttp_write_cb_buffers_size       (2*shttp_write_buffers_size)
+#define shttp_set_length(s, l)               (s).length = (l)
+
+typedef struct shttp_buffer_s {
+  char                                    *s;
+  size_t                                  base;
+  size_t                                  start;
+  size_t                                  end;
+  size_t                                  capacity;
+} shttp_buffer_t;
 
 typedef struct shttp_kv_array_s {
-  size_t                                 capacity;
-  size_t                                 length;
-  shttp_kv_t                             *array;
+  size_t                                  capacity;
+  size_t                                  length;
+  shttp_kv_t                              *array;
 } shttp_kv_array_t;
 
 typedef struct shttp_kv_buffer_s {
-  size_t                                  capacity;
-  shttp_kv_t                              *array;
+  size_t                                   capacity;
+  shttp_kv_t                               *array;
 } shttp_kv_buffer_t;
 
 typedef struct shttp_buffers_s {
-  size_t                                  capacity;
-  size_t                                  length;
-  uv_buf_t                                array[shttp_write_buffers_size];
+  size_t                                   capacity;
+  size_t                                   length;
+  uv_buf_t                                 array[shttp_write_buffers_size];
 } shttp_buffers_t;
 
 typedef struct shttp_write_cb_buffer_s {
-  size_t                                  capacity;
-  size_t                                  length;
-  shttp_write_cb_t                        array[shttp_write_cb_buffers_size];
+  size_t                                   capacity;
+  size_t                                   length;
+  shttp_write_cb_t                         array[shttp_write_cb_buffers_size];
 } shttp_write_cb_buffer_t;
 
 typedef struct shttp_incomming_s {
   // should init while creating
-  shttp_kv_array_t                       headers;
+  shttp_kv_array_t                         headers;
 
   // should init while new request is arrived
-  cstring_t                              url;
+  void                                     *headers_block;
+  sstring_t                                headers_buf;
+  cstring_t                                url;
 } shttp_incomming_t;
-
 
 typedef struct shttp_outgoing_s {
   // should init while creating
@@ -125,18 +139,15 @@ typedef struct shttp_connection_internal_s {
   shttp_incomming_t                        incomming;
   shttp_outgoing_t                         outgoing;
   spool_t                                  pool;
-  void*                                    arena_base;
+  void                                     *arena_base;
   size_t                                   arena_capacity;
-  size_t                                   arena_offset;
 
 
   // should init while new connection is arrived
   uv_tcp_t                                 uv_handle;
   shttp_message_request_parse_status_t     status;
   struct http_parser                       parser;
-
-  // should init while new request is arrived
-  uint32_t                                 head_reading;
+  shttp_buffer_t                           rd_buf;
 
   TAILQ_ENTRY(shttp_connection_internal_s) next;
 } shttp_connection_internal_t;
@@ -154,7 +165,7 @@ TAILQ_HEAD(shttp_connections_s, shttp_connection_internal_s);
 typedef struct shttp_connections_s shttp_connections_t;
 
 struct shttp_s {
-  uv_loop_t*                     uv_loop;
+  uv_loop_t                      *uv_loop;
   struct http_parser_settings    parser_settings;
 
   shttp_connections_t            connections;
@@ -166,11 +177,24 @@ struct shttp_s {
 
 #define SHTTP_STATUS_OK                         200
 
-#define UV_CHECK(r, loop, msg)                    \
-    if (r) {                                      \
-        ERR("%s: %s\n", msg, uv_strerror(r));     \
-        return SHTTP_RES_UV;                      \
+#define UV_CHECK(r, loop, msg)                                                  \
+    if (r) {                                                                    \
+        ERR("%s: %s\n", msg, uv_strerror(r));                                   \
+        return SHTTP_RES_UV;                                                    \
     }
+
+
+
+static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf);
+static void _shttp_connection_on_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf);
+static void _shttp_connection_on_data_writed(uv_write_t* req, int status);
+static void _shttp_connection_on_head_writed(uv_write_t* req, int status);
+static void _shttp_connection_on_disconnect(uv_handle_t* handle);
+int  _shttp_connection_on_message_begin(shttp_connection_internal_t*);
+int  _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn);
+int  _shttp_connection_on_body (shttp_connection_internal_t*, const char *at, size_t length);
+int  _shttp_connection_on_message_complete (shttp_connection_internal_t*);
+
 
 #define call_for(conn, action)                                                  \
   size_t                     i;                                                 \
@@ -233,19 +257,20 @@ static inline void _shttp_response_call_hooks_for_failed(shttp_connection_intern
 #define shttp_strerr(num) num
 
 
-#define INTERNAL_ERROR_HEADERS   "HTTP/0.0 500 Internal Server Error\r\n"    \
-                                 "Connection: close\r\n"                     \
-                                 "Content-Type: text/plain\r\n"              \
+
+#define INTERNAL_ERROR_HEADERS(NUM)   "HTTP/1.1 " NUM "\r\n"                          \
+                                 "Connection: close\r\n"                              \
+                                 "Content-Type: text/plain\r\n"                       \
                                  "\r\n"
 
 
-#define BODY_NOT_COMPLETE        INTERNAL_ERROR_HEADERS                      \
-                                 "Internal Server Error:\r\n"                \
+#define BODY_NOT_COMPLETE        INTERNAL_ERROR_HEADERS("500 Internal Server Error")  \
+                                 "Internal Server Error:\r\n"                         \
                                  "\tBODY_NOT_COMPLETE"
 
 
-#define INTERNAL_ERROR_FROMAT    INTERNAL_ERROR_HEADERS                      \
-                                 "Internal Server Error:\r\n"                \
+#define INTERNAL_ERROR_FROMAT    INTERNAL_ERROR_HEADERS("500 Internal Server Error")  \
+                                 "Internal Server Error:\r\n"                         \
                                  "\t%d"
 
 

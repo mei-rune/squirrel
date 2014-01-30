@@ -27,13 +27,13 @@ typedef struct cstring_s {
 } cstring_t;
 
 #define  SSTRING_DEFAULT  { 0, NULL }
-#define  sstring_init(s, p, l) (s)->str = (p); (s)->len = (l);
-#define  sstring_data(s) (s)->str
-#define  sstring_length(s) (s)->len
-#define  sstring_clear(s) (s)->len = 0
-#define  sstring_assign(s, v) (s)->len = (v)->len; (s)->str = (v)->str
-#define  sstring_truncate(s, l) (s)->len = (l)
-#define  sstring_swap(lhs, rhs) do {         \
+#define  sstring_init(s, p, l) (s).str = (p); (s).len = (l);
+#define  sstring_data(s) (s).str
+#define  sstring_length(s) (s).len
+#define  sstring_clear(s) (s).len = 0
+#define  sstring_assign(s, v) (s).len = (v).len; (s).str = (v).str
+#define  sstring_truncate(s, l) (s).len = (l)
+#define  sstring_swap(lhs, rhs) do {       \
   size_t          len;                     \
   const char*     str;                     \
   len = lhs.len;                           \

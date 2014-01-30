@@ -39,6 +39,9 @@ extern "C" {
 #define assert_cookie(b)
 #endif
 
+
+#ifndef SHTTP_DEBUG
+
 #ifdef DEBUG
 typedef void (*cookie_cb_t)(void*);
 cookie_cb_t cookie_cb;
@@ -332,6 +335,7 @@ DLL_VARIABLE void* spool_commit_alloc(spool_t *pool, size_t size) {
 
 DLL_VARIABLE void spool_stat(spool_t *pool) {
 }
+#endif
 
 #ifdef __cplusplus
 };

@@ -13,6 +13,30 @@ extern "C" {
 #include "squirrel_string.h"
 #include "squirrel_util.h"
 
+
+#ifdef SHTTP_DEBUG
+typedef void*                            spool_t;
+#define spool_alloc_size(size)           shttp_align(size, shttp_cacheline_size)
+#define spool_excepted(s)                (spool_alloc_size(s))
+
+
+#define spool_init(pool, p, capacity)
+#define spool_malloc(pool, size)               malloc(size)
+#define spool_try_realloc(pool, p, size)       nil
+#define spool_realloc(pool, p, size)           realloc(p, size)
+#define spool_free(pool, p)                    free(p)
+
+typedef sstring_t sbuf_t;
+static inline int spool_prepare_alloc(spool_t *pool, sbuf_t *buf) {
+  (buf)->str = (char*)malloc(20*1024);
+  (buf)->len = (20*1024);
+  return 0;
+}
+#define spool_rollback_alloc(pool, buf)    free((buf)->str)
+#define spool_commit_alloc(pool, length)
+#define spool_stat(pool)
+#else
+
 typedef struct spool_block_s {
   uint16_t                    magic;
   uint16_t                    used:1;
@@ -73,6 +97,9 @@ DLL_VARIABLE void spool_stat(spool_t *pool);
 typedef void (*cookie_cb_t)(void*);
 extern cookie_cb_t cookie_cb;
 #endif
+
+#endif
+
 
 #ifdef __cplusplus
 };

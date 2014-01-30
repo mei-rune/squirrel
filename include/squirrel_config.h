@@ -27,5 +27,6 @@
 # define HAS_INET_NTOP 1
 #endif
 
+#define SHTTP_DEBUG 1
 
 #endif //_squirrel_config_h_
