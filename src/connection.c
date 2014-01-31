@@ -106,14 +106,15 @@ static inline void _shttp_connection_assert_external(shttp_t* http, shttp_connec
 static void _shttp_connection_parse_request(shttp_connection_internal_t *conn,
     char* base, ssize_t len, size_t nread) {
   size_t                      parsed;
-  int                         rc, http_errno;
+  int                         rc;
+  enum http_errno             parse_errno;
 
   parsed = http_parser_execute(&conn->parser,
                                &conn_external(conn).http->parser_settings, base, len);
 
-  http_errno = HTTP_PARSER_ERRNO(&conn->parser);
+  parse_errno = HTTP_PARSER_ERRNO(&conn->parser);
 
-  if(HPE_OK == http_errno) {
+  if(HPE_OK == parse_errno) {
     if (len != parsed) {
       ERR("parse error: nread != parsed.");
       uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
@@ -127,8 +128,11 @@ static void _shttp_connection_parse_request(shttp_connection_internal_t *conn,
     return;
   }
 
-  if(HPE_PAUSED != http_errno) {
-    ERR("parse error:%s", http_errno_name(HTTP_PARSER_ERRNO(&conn->parser)));
+  if(HPE_PAUSED != parse_errno) {
+    if(HPE_CB_header_field != parse_errno &&
+        HPE_CB_header_value != parse_errno) {
+      ERR("parse error:%s", http_errno_name(parse_errno));
+    }
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return;
   }
@@ -202,6 +206,12 @@ static void _shttp_connection_on_disconnect(uv_handle_t* handle) {
   http = conn_external(conn).http;
 
   _shttp_connection_memory_check(conn);
+
+  if(nil != conn->callbacks->on_disconnected) {
+    if(0 != conn->callbacks->on_disconnected(&conn_external(conn))) {
+      ERR("callbacks: on_disconnected is failed.");
+    }
+  }
 
   TAILQ_REMOVE(&http->connections, conn, next);
   TAILQ_INSERT_TAIL(&http->free_connections, conn, next);
@@ -294,9 +304,9 @@ int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
   int        res;
 
   if((6 == conn_request(conn).uri.path.len &&
-    0 == strncmp("/stats", conn_request(conn).uri.path.str, 6)) ||
-    (7 == conn_request(conn).uri.path.len &&
-    0 == strncmp("/stats/", conn_request(conn).uri.path.str, 7))) {
+      0 == strncmp("/stats", conn_request(conn).uri.path.str, 6)) ||
+      (7 == conn_request(conn).uri.path.len &&
+       0 == strncmp("/stats/", conn_request(conn).uri.path.str, 7))) {
     res = stats_handler(&conn_external(conn));
   } else {
     res = conn->callbacks->on_message_complete(&conn_external(conn));
@@ -420,6 +430,15 @@ void _shttp_connection_on_connect(uv_stream_t* server_handle, int status) {
     uv_close((uv_handle_t*)&conn->uv_handle, &_shttp_connection_on_disconnect);
     return ;
   }
+
+  if(nil != conn->callbacks->on_connected) {
+    if(0 != conn->callbacks->on_connected(&conn_external(conn))) {
+      ERR("callbacks: on_connected is failed.");
+      uv_close((uv_handle_t*)&conn->uv_handle, &_shttp_connection_on_disconnect);
+      return ;
+    }
+  }
+
   TAILQ_REMOVE(&http->free_connections, conn, next);
   TAILQ_INSERT_TAIL(&http->connections, conn, next);
 

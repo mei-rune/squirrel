@@ -60,27 +60,27 @@ extern "C" {
     }                                                                             \
   } while (0)
 
-#define CHECK_EQ(val1, val2) CHECK_OP(==, val1, val2)
-#define CHECK_NE(val1, val2) CHECK_OP(!=, val1, val2)
-#define CHECK_LE(val1, val2) CHECK_OP(<=, val1, val2)
-#define CHECK_LT(val1, val2) CHECK_OP(< , val1, val2)
-#define CHECK_GE(val1, val2) CHECK_OP(>=, val1, val2)
-#define CHECK_GT(val1, val2) CHECK_OP(> , val1, val2)
+#define CHECK_EQ(val1, val2)       CHECK_OP(==, val1, val2)
+#define CHECK_NE(val1, val2)       CHECK_OP(!=, val1, val2)
+#define CHECK_LE(val1, val2)       CHECK_OP(<=, val1, val2)
+#define CHECK_LT(val1, val2)       CHECK_OP(< , val1, val2)
+#define CHECK_GE(val1, val2)       CHECK_OP(>=, val1, val2)
+#define CHECK_GT(val1, val2)       CHECK_OP(> , val1, val2)
 
-#define ASSERT_EQ(val1, val2) CHECK_EQ(val1, val2)
-#define ASSERT_NE(val1, val2) CHECK_NE(val1, val2)
-#define ASSERT_LE(val1, val2) CHECK_LE(val1, val2)
-#define ASSERT_LT(val1, val2) CHECK_LT(val1, val2)
-#define ASSERT_GE(val1, val2) CHECK_GE(val1, val2)
-#define ASSERT_GT(val1, val2) CHECK_GT(val1, val2)
+#define ASSERT_EQ(val1, val2)      CHECK_EQ(val1, val2)
+#define ASSERT_NE(val1, val2)      CHECK_NE(val1, val2)
+#define ASSERT_LE(val1, val2)      CHECK_LE(val1, val2)
+#define ASSERT_LT(val1, val2)      CHECK_LT(val1, val2)
+#define ASSERT_GE(val1, val2)      CHECK_GE(val1, val2)
+#define ASSERT_GT(val1, val2)      CHECK_GT(val1, val2)
 
 
-#define ASSERT_TRUE(cond)      CHECK(cond)
-#define ASSERT_FALSE(cond)     CHECK(!(cond))
-#define ASSERT_STREQ(a, b)    CHECK((a == b) || ( a !=0 && b !=0 && strcmp(a, b) == 0))
+#define ASSERT_TRUE(cond)          CHECK(cond)
+#define ASSERT_FALSE(cond)         CHECK(!(cond))
+#define ASSERT_STREQ(a, b)         CHECK((a == b) || ( a !=0 && b !=0 && strcmp(a, b) == 0))
+#define ASSERT_STRNCMP(a, b, n)    CHECK(0 == strncmp(a, b, n))
 
-#define CHECK_ERR(invocation)  PCHECK((invocation) != -1)
-
+#define CHECK_ERR(invocation)      PCHECK((invocation) != -1)
 
 #define LOG_VPRINTF(fmt, argList) do {                                \
     if(0 != out_fn)                                                   \

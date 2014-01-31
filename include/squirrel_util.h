@@ -21,7 +21,9 @@
 #define strtoull    _strtoui64
 #define filelength  _filelength
 #define fileno      _fileno
+#ifndef _CRTDBG_MAP_ALLOC
 #define getcwd      _getcwd
+#endif
 #define stat        _stat
 #define access      _access
 

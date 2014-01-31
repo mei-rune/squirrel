@@ -2,6 +2,8 @@
 #ifndef _squirrel_config_h_
 #define _squirrel_config_h_ 1
 
+#define _CRTDBG_MAP_ALLOC
+
 #ifdef _WIN32
 // 定义此宏表示将在 win2003 上运行
 #ifndef _WIN32_WINNT

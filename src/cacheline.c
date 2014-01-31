@@ -1,13 +1,8 @@
 
 
 
-#define CSTRING_ALLOC_GRANULARITY   (8)
-#define CSTRING_OFFSET_SIZE         (16)
 
-
-#define cstring_assert(expr)        assert(expr)
-
-
+#include "squirrel_config.h"
 #include <stddef.h>
 
 #if defined(__APPLE__)

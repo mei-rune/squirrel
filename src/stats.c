@@ -8,7 +8,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
+
 cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
 
 int stats_handler(shttp_connection_t* external) {
@@ -34,7 +34,8 @@ int stats_handler(shttp_connection_t* external) {
 #define X(uc, lc) case UV_##uc: type = #lc; break;
       UV_HANDLE_TYPE_MAP(X)
 #undef X
-      default: type = "<unknown>";
+    default:
+      type = "<unknown>";
     }
     if(len < 128) {
       shttp_response_write(external, p, len, &shttp_response_pool_free, p);
@@ -44,12 +45,12 @@ int stats_handler(shttp_connection_t* external) {
     }
 
     len += snprintf(p + len, capacity - len,
-            "[%c%c%c] %-8s %p\n",
-            "R-"[!(h->flags & UV__HANDLE_REF)],
-            "A-"[!(h->flags & UV__HANDLE_ACTIVE)],
-            "I-"[!(h->flags & UV__HANDLE_INTERNAL)],
-            type,
-            (void*)h);
+                    "[%c%c%c] %-8s %p\n",
+                    "R-"[!(h->flags & UV__HANDLE_REF)],
+                    "A-"[!(h->flags & UV__HANDLE_ACTIVE)],
+                    "I-"[!(h->flags & UV__HANDLE_INTERNAL)],
+                    type,
+                    (void*)h);
   }
   if(nil != p) {
     if(0 < len) {
@@ -65,5 +66,5 @@ int stats_handler(shttp_connection_t* external) {
 
 
 #ifdef __cplusplus
-}
+};
 #endif

@@ -96,7 +96,7 @@ typedef struct http_handler_config_s   shttp_handler_config_t;
 typedef struct shttp_connection_s      shttp_connection_t;
 typedef struct shttp_settings_s        shttp_settings_t;
 typedef struct shttp_s                 shttp_t;
-
+typedef void (*shttp_query_cb)(void* ctx, const char* key, size_t key_len, const char* val, size_t val_len);
 typedef int  (*shttp_data_cb) (shttp_connection_t*, const char *at, size_t length);
 typedef int  (*shttp_cb) (shttp_connection_t*);
 typedef void (*shttp_write_cb) (shttp_connection_t *conn, void *data);
@@ -113,9 +113,11 @@ typedef void (*shttp_write_cb) (shttp_connection_t *conn, void *data);
  *
  */
 struct shttp_callbacks_s {
+  shttp_cb        on_connected;
   shttp_cb        on_message_begin;
   shttp_data_cb   on_body;
   shttp_cb        on_message_complete;
+  shttp_cb        on_disconnected;
 };
 
 
@@ -425,6 +427,8 @@ DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data
  */
 /**@{*/
 DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
+
+DLL_VARIABLE int shttp_parse_query_string(const char * query, size_t len, shttp_query_cb cb, void* ctx);
 
 /**
   A callback function used to intercept Libevent's log messages.

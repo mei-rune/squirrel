@@ -185,7 +185,7 @@ static inline size_t max_recv(uv_os_sock_t sock, char* simple_request, size_t si
     time_val.tv_sec ++;
     usec -= 1000000;
   }
-  time_val.tv_usec = usec;
+  time_val.tv_usec = (long)usec;
 
   while(socket_poll(sock, time_val, select_read )) {
     n = recv(sock, simple_request + recv_size, (int)(simple_request_len - recv_size), 0);

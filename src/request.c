@@ -133,7 +133,6 @@ static int _http_request_on_header_field(http_parser *inner, const char *at, siz
     break;
   default:
     ERR("parse error: head field status is unknown(%d).", conn->status);
-    assert(false);
     return -1;
   }
   return 0;

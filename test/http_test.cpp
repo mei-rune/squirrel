@@ -68,6 +68,33 @@ TEST(http, large_headers) {
   WEB_STOP();
 }
 
+TEST(http, headers_count_to_large) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  shttp_set_log_callback(&on_log, &log_buf);
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, GET_REQUEST, strlen(GET_REQUEST)));
+  for(s =0; s < 250; s ++) {
+    send_n(sock, "h: 3\r\n", 6);
+  }
+  send_n(sock, "\r\n", 2);
+
+  s = max_recv(sock, buf, 2048, 200 * RECV_TIMEOUT);
+  ASSERT_EQ( s, 0);
+  closesocket(sock);
+
+  log_buf.str[log_buf.len] = 0;
+  ASSERT_STREQ("parse error: header length too large.", log_buf.str);
+
+  WEB_STOP();
+}
+
 TEST(http, pipeline_request) {
   WEB_DECL();
   uv_os_sock_t     sock;
@@ -113,6 +140,33 @@ TEST(http, send_error_request) {
   WEB_STOP();
 }
 
+
+
+TEST(http, connections_overflow) {
+  WEB_DECL();
+  uv_os_sock_t     sock[2];
+  uv_os_sock_t     overflow;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.max_connections_size = 2;
+  //shttp_set_log_callback(&on_log, &log_buf);
+  WEB_START();
+
+  sock[0] = connect_tcp("127.0.0.1", TEST_PORT);
+  sock[1] = connect_tcp("127.0.0.1", TEST_PORT);
+
+  overflow = connect_tcp("127.0.0.1", TEST_PORT);
+
+  s = max_recv(overflow, buf, 2048, 1000*RECV_TIMEOUT);
+  ASSERT_EQ( s, 0);
+  closesocket(sock[0]);
+  closesocket(sock[1]);
+  closesocket(overflow);
+
+  WEB_STOP();
+}
 
 TEST(http, pipeline_request_while_two_read) {
   WEB_DECL();

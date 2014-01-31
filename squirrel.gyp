@@ -95,6 +95,7 @@
         'src/log.c',
         'src/cacheline.c',
         'src/stats.c',
+        'src/query_string.c',
         'src/utils.c',
         'src/test.c',
       ],
@@ -192,6 +193,7 @@
         'src/log.c',
         'src/cacheline.c',
         'src/stats.c',
+        'src/query_string.c',
         'src/utils.c',
         'src/test.c',
       ],
@@ -223,6 +225,7 @@
         'test/pool_test.cpp',
         'test/http_test.h',
         'test/http_test.cpp',
+        'test/query_string_test.cpp',
         'test/main.c',
       ],
     }, # hello_world sample
