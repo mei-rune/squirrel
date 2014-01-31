@@ -141,7 +141,6 @@ int shttp_parse_query_string(const char * query, size_t len, shttp_query_cb cb, 
   size_t                     val_len;
   unsigned char              ch;
   size_t                     i;
-  int                        res;
 
   key_len = 0;
   val_len = 0;

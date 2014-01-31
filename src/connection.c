@@ -286,8 +286,7 @@ int _shttp_connection_on_message_begin(shttp_connection_internal_t* conn) {
   conn_response(conn).status_code = SHTTP_STATUS_OK;
   conn_response(conn).chunked = SHTTP_THUNKED_NONE;
   conn_response(conn).close_connection = SHTTP_CLOSE_CONNECTION_NONE;
-
-  return conn->callbacks->on_message_begin(&conn_external(conn));
+  return 0;
 }
 
 int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at, size_t length) {
@@ -297,7 +296,7 @@ int _shttp_connection_on_body (shttp_connection_internal_t* conn, const char *at
 int _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn) {
   conn_incomming(conn).headers_block = conn->rd_buf.s;
   conn_incomming(conn).headers_buf.len = conn->parser.nread;
-  return 0;
+  return conn->callbacks->on_message_begin(&conn_external(conn));
 }
 
 int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {

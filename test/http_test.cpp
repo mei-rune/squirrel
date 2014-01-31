@@ -39,7 +39,6 @@ TEST(http, simple) {
   WEB_STOP();
 }
 
-
 TEST(http, large_headers) {
   // large_headers will realloc memory while reading headers, and relocate buffers
   WEB_DECL();
@@ -283,6 +282,35 @@ TEST(http, end_not_call_with_not_thunked) {
 
   log_buf.str[log_buf.len] = 0;
   ASSERT_STREQ("callback: chunked must is true while body is not completed.", log_buf.str);
+
+  WEB_STOP();
+}
+
+int on_message_begin_with_reply(shttp_connection_t* conn) {
+  return on_message_complete(conn);
+}
+
+int on_message_complete_empty(shttp_connection_t* conn) {
+  return 0;
+}
+
+TEST(http, reply_in_begin) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_begin = &on_message_begin_with_reply;
+  settings.callbacks.on_message_complete = &on_message_complete_empty;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
 
   WEB_STOP();
 }

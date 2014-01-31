@@ -19,6 +19,8 @@ void _shttp_connection_on_connect(uv_stream_t* server_handle, int status);
  * HTTP Server API
  ****************************************************************************/
 
+cstring_t HTTP_CONTENT_HTML = { 9, "text/html"};
+cstring_t HTTP_CONTENT_TEXT = { 10, "text/plain"};
 
 DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
   shttp_t                     *http = NULL;

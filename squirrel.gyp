@@ -95,6 +95,7 @@
         'src/log.c',
         'src/cacheline.c',
         'src/stats.c',
+        'src/handler.c',
         'src/query_string.c',
         'src/utils.c',
         'src/test.c',
@@ -193,6 +194,7 @@
         'src/log.c',
         'src/cacheline.c',
         'src/stats.c',
+        'src/handler.c',
         'src/query_string.c',
         'src/utils.c',
         'src/test.c',
@@ -278,5 +280,34 @@
         ],
       }],
     }, # hello_world sample
+
+	
+    ########################################
+    # ssh sample
+    ########################################
+    {
+      'target_name': 'ssh_bridge',
+      'product_name': 'ssh_bridge',
+      'type': 'executable',
+
+      'dependencies': [
+        'squirrel',
+      ],
+      
+      'include_dirs': [
+        './include',
+      ],
+
+      'sources': [
+        'apps/ssh.c',
+      ],
+
+      'copies': [
+      {
+        'destination': '<(PRODUCT_DIR)',
+        'files': [
+        ],
+      }],
+    }, # ssh sample
   ],
 }

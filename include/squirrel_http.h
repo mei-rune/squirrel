@@ -39,7 +39,7 @@ extern "C" {
 /** @name Request Methods
  */
 /**@{*/
-#define SHTTP_METHOD_MAP(XX)       \
+#define SHTTP_METHOD_MAP(XX)      \
 XX(0,  DELETE,      DELETE)       \
 XX(1,  GET,         GET)          \
 XX(2,  HEAD,        HEAD)         \
@@ -426,9 +426,14 @@ DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data
 /** @name http utility methods
  */
 /**@{*/
+extern cstring_t HTTP_CONTENT_HTML;
+extern cstring_t HTTP_CONTENT_TEXT;
+
 DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
 
 DLL_VARIABLE int shttp_parse_query_string(const char * query, size_t len, shttp_query_cb cb, void* ctx);
+
+DLL_VARIABLE int shttp_notfound_handler(shttp_connection_t* conn);
 
 /**
   A callback function used to intercept Libevent's log messages.
