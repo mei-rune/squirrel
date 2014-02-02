@@ -60,10 +60,10 @@ TEST(int_buffer, simple) {
 
   int_buffer_init(&rb, (long*)malloc(10 * sizeof(long)), 10);
   for(i = 0; i < 100; i++) {
-    int_buffer_step(&rb);
+    int_buffer_prepare(&rb);
     check_int_buffer(out_fn, &rb, i, true);
 
-    t = int_buffer_step(&rb);
+    t = int_buffer_prepare(&rb);
     *t = i;
     int_buffer_push(&rb);
     check_int_buffer(out_fn, &rb, i, false);
