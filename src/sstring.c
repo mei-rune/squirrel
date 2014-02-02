@@ -371,6 +371,46 @@ DLL_VARIABLE int sbuffer_replaceAll(sbuffer_t*       pcs
   return 0;
 }
 
+
+DLL_VARIABLE int stoken_next(stoken_ctx_t *ctx, cstring_t *buf) {
+  const char    * p;
+
+  if(0 == ctx->len) {
+    return -1;
+  }
+  p = (char*)memchr(ctx->start, *ctx->delimit_str, ctx->len);
+  while(nil != p) {
+    if(1 == ctx->delimit_len) {
+      goto found;
+    }
+    if( (ctx->len - (p - ctx->start)) < ctx->delimit_len) {
+      break;
+    }
+    if(0 == memcmp(p, ctx->delimit_str, ctx->delimit_len)) {
+      goto found;
+    }
+    p = (char*)memchr(p + 1,
+                      *ctx->delimit_str,
+                      ctx->len - (p - ctx->start) -1);
+  }
+
+  buf->str = ctx->start;
+  buf->len = ctx->len;
+
+  ctx->start = nil;
+  ctx->len = 0;
+  return 0;
+
+found:
+  buf->str = ctx->start;
+  buf->len = (p - ctx->start);
+
+  ctx->len -= buf->len;
+  ctx->len -= ctx->delimit_len;
+  ctx->start = (p + ctx->delimit_len);
+  return 0;
+}
+
 #ifdef __cplusplus
 };
 #endif

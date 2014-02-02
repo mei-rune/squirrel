@@ -43,6 +43,8 @@
           'sources': [
             'include/win32/sys/queue.h',
             'include/win32/sys/tree.h',
+            'include/win32/pthread_windows.h',
+            'src/win32/pthread_windows.c',
           ],
           'include_dirs': [
             'include/win32',
@@ -142,6 +144,8 @@
           'sources': [
             'include/win32/sys/queue.h',
             'include/win32/sys/tree.h',
+            'include/win32/pthread_windows.h',
+            'src/win32/pthread_windows.c',
           ],
           'include_dirs': [
             'include/win32',
@@ -228,6 +232,7 @@
         'test/http_test.h',
         'test/http_test.cpp',
         'test/query_string_test.cpp',
+        'test/string_test.cpp',
         'test/main.c',
       ],
     }, # hello_world sample

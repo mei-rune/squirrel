@@ -99,6 +99,80 @@ DLL_VARIABLE sbuffer_t* sbuffer_append_sprintf(sbuffer_t* pcs, const char*fmt, .
 
 DLL_VARIABLE sbuffer_t* sbuffer_append_from_file(sbuffer_t* pcs, const char* name);
 
+
+
+static inline int cstring_hash(const cstring_t *k) {
+  int hash = 5381;
+  size_t i;
+  const char *key = (const char *) k->str;
+
+  for (i = 0; i < k->len; i++)
+    hash = ((hash << 5) + hash) + key[i]; /* hash * 33 + char */
+
+  return hash;
+}
+
+static inline int cstring_cmp(const cstring_t *k1, const cstring_t *k2) {
+  if(k1->len == k2->len)
+    return memcmp(k1->str, k2->str, k1->len);
+  else if(k1->len > k2->len)
+    return 1;
+  else
+    return -1;
+}
+
+static inline int sstring_hash(const sstring_t *k) {
+  int hash = 5381;
+  size_t i;
+  const char *key = (const char *) k->str;
+
+  for (i = 0; i < k->len; i++)
+    hash = ((hash << 5) + hash) + key[i]; /* hash * 33 + char */
+
+  return hash;
+}
+
+static inline int sstring_cmp(const sstring_t *k1, const sstring_t *k2) {
+  if(k1->len == k2->len)
+    return memcmp(k1->str, k2->str, k1->len);
+  else if(k1->len > k2->len)
+    return 1;
+  else
+    return -1;
+}
+
+
+
+static inline int strhash(const char *k) {
+  int hash = 5381;
+  size_t i, len;
+  const char *key;
+
+  key = (const char *) k;
+  len = strlen(k);
+
+  for (i = 0; i < len; i++)
+    hash = ((hash << 5) + hash) + key[i]; /* hash * 33 + char */
+
+  return hash;
+}
+
+typedef struct stoken_ctx_s {
+  const char *start;
+  size_t      len;
+  const char *delimit_str;
+  size_t      delimit_len;
+} stoken_ctx_t;
+
+static inline void stoken_init(stoken_ctx_t *ctx, const char* txt, size_t len, const char *delimit_str, size_t delimit_len) {
+  ctx->start = txt;
+  ctx->len = (-1 == len)?strlen(txt):len;
+  ctx->delimit_str = delimit_str;
+  ctx->delimit_len =  (-1 == delimit_len)?strlen(delimit_str):delimit_len;
+}
+
+DLL_VARIABLE int stoken_next(stoken_ctx_t *ctx, cstring_t *buf);
+
 #ifdef __cplusplus
 };
 #endif

@@ -22,12 +22,12 @@ void print_handlers(shttp_connection_internal_t* conn) {
   external = &conn_external(conn);
   p = (char*)shttp_response_mem_malloc(external, 2*1024);
   if(nil == p) {
-     shttp_response_write(external, MEMORY_INSUFFICIENT, strlen(MEMORY_INSUFFICIENT), nil, nil);
-     return;
+    shttp_response_write(external, MEMORY_INSUFFICIENT, strlen(MEMORY_INSUFFICIENT), nil, nil);
+    return;
   }
   capacity = 2*1024;
   len = 0;
-  
+
   shttp_response_write(external, "handlers:\r\n", 11, nil, nil);
   QUEUE_FOREACH(q, & external->http->uv_loop->handle_queue) {
     h = QUEUE_DATA(q, uv_handle_t, handle_queue);
@@ -78,12 +78,12 @@ void print_connections(shttp_connection_internal_t* conn) {
 
   p = (char*)shttp_response_mem_malloc(external, 2*1024);
   if(nil == p) {
-     shttp_response_write(external, MEMORY_INSUFFICIENT, strlen(MEMORY_INSUFFICIENT), nil, nil);
-     return;
+    shttp_response_write(external, MEMORY_INSUFFICIENT, strlen(MEMORY_INSUFFICIENT), nil, nil);
+    return;
   }
   capacity = 2*1024;
   len = 0;
-  
+
   shttp_response_write(external, "connections:\r\n", 14, nil, nil);
 
   TAILQ_FOREACH(c, &conn->external.http->connections, next) {
@@ -98,13 +98,13 @@ void print_connections(shttp_connection_internal_t* conn) {
       len = 0;
     }
 
-    
+
     len += snprintf(p + len, capacity - len,
                     "%p [handle=%p]\r\n",
                     (void*)c,
                     (void*)&(c->uv_handle));
   }
-  
+
 
   if(nil != p) {
     if(0 < len) {
@@ -125,12 +125,12 @@ void print_listenings(shttp_connection_internal_t* conn) {
 
   p = (char*)shttp_response_mem_malloc(external, 2*1024);
   if(nil == p) {
-     shttp_response_write(external, MEMORY_INSUFFICIENT, strlen(MEMORY_INSUFFICIENT), nil, nil);
-     return;
+    shttp_response_write(external, MEMORY_INSUFFICIENT, strlen(MEMORY_INSUFFICIENT), nil, nil);
+    return;
   }
   capacity = 2*1024;
   len = 0;
-  
+
   shttp_response_write(external, "listenings:\r\n", 13, nil, nil);
 
   TAILQ_FOREACH(c, &conn->external.http->listenings, next) {
@@ -145,13 +145,13 @@ void print_listenings(shttp_connection_internal_t* conn) {
       len = 0;
     }
 
-    
+
     len += snprintf(p + len, capacity - len,
                     "%p [handle=%p]\r\n",
                     (void*)c,
                     (void*)&(c->uv_handle));
   }
-  
+
 
   if(nil != p) {
     if(0 < len) {

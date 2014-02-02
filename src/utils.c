@@ -144,5 +144,5 @@ DLL_VARIABLE cstring_t* shttp_status_code_text(int status) {
 }
 
 #ifdef __cplusplus
-}
+};
 #endif

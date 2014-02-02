@@ -18,7 +18,7 @@ void on_log(void* ctx, int severity, const char *fmt, va_list ap) {
 }
 
 static inline int on_http_get(shttp_connection_t* conn, context_t *ctx) {
-  //if()
+
   return 0;
 }
 int  on_message_begin (shttp_connection_t* conn) {
@@ -30,7 +30,7 @@ int  on_message_begin (shttp_connection_t* conn) {
 
   switch(conn->request.method) {
   case SHTTP_REQ_GET:
-    return on_http_get(conn);
+    return on_http_get(conn, ctx);
   }
   return 0;
 }
