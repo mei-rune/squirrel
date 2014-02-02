@@ -322,7 +322,7 @@ FUNC_DECL    entry_type* name##_iterator_current(name##_iterator_t* it) {       
 #define key_in_value_get_ref(el)      (el)->ref
 #define key_in_value_get_value(el)    (el)
 #define key_in_value_get_next(el)     (el)->next
-#define key_in_value_set_key(el, v)   
+#define key_in_value_set_key(el, v)
 #define key_in_value_set_value(el, v) (el) = (v)
 #define key_in_value_set_next(el, v)  (el)->next = (v)
 

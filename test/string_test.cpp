@@ -47,7 +47,7 @@ TEST(sstring, stoken) {
   ASSERT_NEXT("", 0);
   ASSERT_EQ(-1, stoken_next(&ctx, &buf));
 
-  
+
   stoken_init(&ctx, "a/b//c/", -1, "/", 1);
   ASSERT_NEXT("a", 1);
   ASSERT_NEXT("b", 1);

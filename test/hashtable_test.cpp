@@ -131,7 +131,7 @@ TEST(hashtable, simple_entry) {
   ASSERT_KV("a5", "b5");
   ASSERT_KV("a6", "b6");
   ASSERT_KV("a7", "b7");
-  
+
   ASSERT_EQ(7, kvs_count(&h));
 
   kvs_del(&h, "a1");
@@ -141,7 +141,7 @@ TEST(hashtable, simple_entry) {
   kvs_del(&h, "a5");
   kvs_del(&h, "a6");
   kvs_del(&h, "a7");
-  
+
   ASSERT_EQ(nil, kvs_get(&h, "a1", nil));
   ASSERT_EQ(nil, kvs_get(&h, "a2", nil));
   ASSERT_EQ(nil, kvs_get(&h, "a3", nil));
@@ -152,7 +152,7 @@ TEST(hashtable, simple_entry) {
 
   ASSERT_EQ(0, kvs_count(&h));
 
-  
+
   PUT_KV("a1", "b1");
   PUT_KV("a2", "b2");
   PUT_KV("a3", "b3");

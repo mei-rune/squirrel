@@ -382,7 +382,7 @@ DLL_VARIABLE int stoken_next(stoken_ctx_t *ctx, cstring_t *buf) {
     buf->str = ctx->start;
     buf->len = 0;
 
-    
+
     ctx->start = nil;
     return 0;
   }
