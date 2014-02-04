@@ -43,8 +43,6 @@
           'sources': [
             'include/win32/sys/queue.h',
             'include/win32/sys/tree.h',
-            'include/win32/pthread_windows.h',
-            'src/win32/pthread_windows.c',
           ],
           'include_dirs': [
             'include/win32',
@@ -77,6 +75,7 @@
 
       'sources': [
         'include/squirrel_config.h',
+        'include/squirrel_atomic.h',
         'include/squirrel_http.h',
         'include/squirrel_link.h',
         'include/squirrel_array.h',
@@ -89,6 +88,7 @@
         'src/internal.h',
         'src/connection.c',
         'src/request.c',
+        'src/response_helper.h',
         'src/response.c',
         'src/error_response.c',
         'src/server.c',
@@ -145,8 +145,6 @@
           'sources': [
             'include/win32/sys/queue.h',
             'include/win32/sys/tree.h',
-            'include/win32/pthread_windows.h',
-            'src/win32/pthread_windows.c',
           ],
           'include_dirs': [
             'include/win32',
@@ -179,6 +177,7 @@
 
     'sources': [
         'include/squirrel_config.h',
+        'include/squirrel_atomic.h',
         'include/squirrel_http.h',
         'include/squirrel_link.h',
         'include/squirrel_array.h',
@@ -191,6 +190,7 @@
         'src/internal.h',
         'src/connection.c',
         'src/request.c',
+        'src/response_helper.h',
         'src/response.c',
         'src/error_response.c',
         'src/server.c',
@@ -306,6 +306,8 @@
       ],
 
       'sources': [
+        'apps/ssh_backend.h',
+        'apps/ssh_backend.c',
         'apps/ssh.c',
       ],
 

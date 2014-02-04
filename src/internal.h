@@ -26,6 +26,7 @@
 #include "squirrel_string.h"
 #include "squirrel_pool.h"
 #include "squirrel_http.h"
+#include "squirrel_atomic.h"
 
 
 #ifdef __cplusplus
@@ -74,7 +75,7 @@ typedef enum shttp_message_request_parse_status_e {
 #define shttp_set_length(s, l)               (s).length = (l)
 
 typedef struct shttp_buffer_s {
-  char                                    *s;
+  char                                  * s;
   size_t                                  base;
   size_t                                  start;
   size_t                                  end;
@@ -84,12 +85,12 @@ typedef struct shttp_buffer_s {
 typedef struct shttp_kv_array_s {
   size_t                                  capacity;
   size_t                                  length;
-  shttp_kv_t                              *array;
+  shttp_kv_t                            * array;
 } shttp_kv_array_t;
 
 typedef struct shttp_kv_buffer_s {
   size_t                                   capacity;
-  shttp_kv_t                               *array;
+  shttp_kv_t                             * array;
 } shttp_kv_buffer_t;
 
 typedef struct shttp_buffers_s {
@@ -109,7 +110,7 @@ typedef struct shttp_incomming_s {
   shttp_kv_array_t                         headers;
 
   // should init while new request is arrived
-  void                                     *headers_block;
+  void                                   * headers_block;
   sstring_t                                headers_buf;
   cstring_t                                url;
 } shttp_incomming_t;
@@ -122,28 +123,58 @@ typedef struct shttp_outgoing_s {
   shttp_write_cb_buffer_t                  call_after_completed;
   shttp_write_cb_buffer_t                  call_after_data_writed;
 
-
   // should init while new request is arrived
   uv_write_t                               write_req;
   sstring_t                                content_type;
   sbuffer_t                                head_buffer;
+  sbuffer_t                                body_buffer;
   shttp_res                                failed_code;
-  uint64_t                                 is_body_end:1;
-  uint64_t                                 reserved:63;
+  uint32_t                                 is_body_end:1;
+#ifdef SHTTP_THREAD_SAFE
+  uint32_t                                 reserved1:31;
+  atomic32_t                               is_async;
+  atomic32_t                               is_writing;
+  atomic32_t                               thread_id;
+#else
+  uint32_t                                 is_async:1;
+  uint32_t                                 is_writing:1;
+  uint32_t                                 reserved1:29;
+  uint32_t                                 thread_id;
+#endif
 } shttp_outgoing_t;
+
+
+#ifdef SHTTP_THREAD_SAFE
+#define shttp_atomic_add32(mem, val)               atomic_add32(mem, val)
+#define shttp_atomic_sub32(mem, val)               atomic_sub32(mem, val)
+#define shttp_atomic_dec32(mem)                    atomic_dec32(mem)
+#define shttp_atomic_inc32(mem)                    atomic_inc32(mem)
+#define shttp_atomic_read32(mem)                   atomic_read32(mem)
+#define shttp_atomic_set32(mem, val)               atomic_set32(mem, val)
+#define shttp_atomic_cvs32(mem, new_val, old_val)  atomic_cvs32(mem, new_val, old_val)
+#else
+#define shttp_atomic_add32(mem, val)               *(mem) += val
+#define shttp_atomic_sub32(mem, val)               *(mem) -= val
+#define shttp_atomic_dec32(mem)                    -- *(mem)
+#define shttp_atomic_inc32(mem)                    ++ *(mem)
+#define shttp_atomic_read32(mem)                   *(mem)
+#define shttp_atomic_set32(mem, val)               *(mem) = val
+#define shttp_atomic_cvs32(mem, new_val, old_val)  *(mem) = ((*(mem) == (old_val))? (new_val) : (old_val))
+#endif
 
 typedef struct shttp_connection_internal_s {
   // should init while creating
   shttp_connection_t                       external;
-  shttp_callbacks_t                        *callbacks;
+  shttp_callbacks_t                      * callbacks;
   shttp_incomming_t                        incomming;
   shttp_outgoing_t                         outgoing;
   spool_t                                  pool;
-  void                                     *arena_base;
+  void                                   * arena_base;
   size_t                                   arena_capacity;
 
 
   // should init while new connection is arrived
+  uv_async_t                               flush_signal;
   uv_tcp_t                                 uv_handle;
   shttp_message_request_parse_status_t     status;
   struct http_parser                       parser;
@@ -156,6 +187,7 @@ typedef struct shttp_connection_internal_s {
 #define conn_external(it)  (it)->external
 #define conn_request(it)   (it)->external.request
 #define conn_response(it)  (it)->external.response
+
 #define conn_incomming(it) (it)->incomming
 #define conn_outgoing(it)  (it)->outgoing
 
@@ -165,14 +197,17 @@ TAILQ_HEAD(shttp_connections_s, shttp_connection_internal_s);
 typedef struct shttp_connections_s shttp_connections_t;
 
 struct shttp_s {
-  uv_loop_t                      *uv_loop;
-  struct http_parser_settings    parser_settings;
+  uv_loop_t                             * uv_loop;
+  uv_async_t                              shutdown_signal;
+  struct http_parser_settings             parser_settings;
 
-  shttp_connections_t            connections;
-  shttp_connections_t            free_connections;
+  shttp_connections_t                     connections;
+  shttp_connections_t                     free_connections;
 
-  shttp_listenings_t             listenings;
-  shttp_settings_t               settings;
+  shttp_listenings_t                      listenings;
+  shttp_settings_t                        settings;
+
+  void                                  * context;
 };
 
 #define SHTTP_STATUS_OK                         200
@@ -187,9 +222,10 @@ struct shttp_s {
 
 static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf);
 static void _shttp_connection_on_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf);
-static void _shttp_connection_on_data_writed(uv_write_t* req, int status);
-static void _shttp_connection_on_head_writed(uv_write_t* req, int status);
-static void _shttp_connection_on_disconnect(uv_handle_t* handle);
+
+void _shttp_connection_on_data_writed(uv_write_t* req, int status);
+void _shttp_connection_on_head_writed(uv_write_t* req, int status);
+void _shttp_connection_on_disconnect(uv_handle_t* handle);
 int  _shttp_connection_on_message_begin(shttp_connection_internal_t*);
 int  _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn);
 int  _shttp_connection_on_body (shttp_connection_internal_t*, const char *at, size_t length);
@@ -218,27 +254,23 @@ static inline void _shttp_response_call_hooks_after_writed(shttp_connection_inte
 }
 
 
-
-void _shttp_response_send_ready_data(shttp_connection_internal_t *conn,
-                                     uv_close_cb on_disconnect,
-                                     uv_write_cb on_head_writed,
-                                     uv_write_cb on_data_writed);
+typedef void (*swrite_cb_t)(shttp_connection_internal_t*);
+void _shttp_response_async_send(shttp_connection_internal_t *conn);
+void _shttp_response_sync_send(shttp_connection_internal_t *conn);
 void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
-                                        uv_close_cb on_disconnect,
                                         const char* message_str,
                                         size_t message_len);
 void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn,
-    uv_close_cb on_disconnect,
     const char  *fmt,
     ...);
 void _shttp_response_on_completed(shttp_connection_internal_t *conn, int status);
 
 #ifdef DEBUG
 static inline void _shttp_response_assert_after_response_end(shttp_connection_internal_t *conn) {
-  assert(0 == conn_outgoing(conn).head_write_buffers.length);
-  assert(0 == conn_outgoing(conn).body_write_buffers.length);
-  assert(0 == conn_outgoing(conn).call_after_data_writed.length);
-  assert(0 == conn_outgoing(conn).call_after_completed.length);
+  shttp_assert(0 == conn_outgoing(conn).head_write_buffers.length);
+  shttp_assert(0 == conn_outgoing(conn).body_write_buffers.length);
+  shttp_assert(0 == conn_outgoing(conn).call_after_data_writed.length);
+  shttp_assert(0 == conn_outgoing(conn).call_after_completed.length);
 }
 #else
 #define _shttp_response_assert_after_response_end(conn)

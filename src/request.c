@@ -13,7 +13,7 @@ static int _http_request_on_message_begin(http_parser* inner) {
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  assert(shttp_message_request_parse_none == conn->status);
+  shttp_assert(shttp_message_request_parse_none == conn->status);
   conn->status = shttp_message_request_parse_begin;
   return _shttp_connection_on_message_begin(conn);
 }
@@ -37,12 +37,12 @@ static int _http_request_on_url(http_parser *inner, const char *at, size_t lengt
     conn_incomming(conn).url.len = length;
     break;
   case shttp_message_request_parse_url:
-    assert((conn_incomming(conn).url.str + conn_incomming(conn).url.len) == at);
+    shttp_assert((conn_incomming(conn).url.str + conn_incomming(conn).url.len) == at);
     conn_incomming(conn).url.len += length;
     break;
   default:
     ERR("parse error: url status is unknown(%d).", conn->status);
-    assert(false);
+    shttp_assert(false);
     return -1;
   }
   return 0;
@@ -117,7 +117,7 @@ static int _http_request_on_header_field(http_parser *inner, const char *at, siz
     current_header.key.len = length;
     break;
   case shttp_message_request_parse_field:
-    assert((current_header.key.str + current_header.key.len) == at);
+    shttp_assert((current_header.key.str + current_header.key.len) == at);
     current_header.key.len += length;
     break;
   case shttp_message_request_parse_value:
@@ -147,7 +147,7 @@ static int _http_request_on_header_value(http_parser *inner, const char *at, siz
 
   switch(conn->status) {
   case shttp_message_request_parse_value:
-    assert((current_header.val.str + current_header.val.len) == at);
+    shttp_assert((current_header.val.str + current_header.val.len) == at);
     current_header.val.len += length;
     break;
   case shttp_message_request_parse_field:
@@ -157,7 +157,7 @@ static int _http_request_on_header_value(http_parser *inner, const char *at, siz
     break;
   default:
     ERR("parse error: head value status is unknown(%d).", conn->status);
-    assert(false);
+    shttp_assert(false);
     return -1;
   }
   return 0;
@@ -188,7 +188,7 @@ static int _http_request_on_body(http_parser *inner, const char *at, size_t leng
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  assert(shttp_message_request_parse_body == conn->status ||
+  shttp_assert(shttp_message_request_parse_body == conn->status ||
          shttp_message_request_parse_headers_ok == conn->status);
   conn->status = shttp_message_request_parse_body;
   return _shttp_connection_on_body(conn, at, length);
@@ -198,7 +198,7 @@ static int _http_request_on_message_complete(http_parser* inner) {
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  assert(shttp_message_request_parse_body == conn->status ||
+  shttp_assert(shttp_message_request_parse_body == conn->status ||
          shttp_message_request_parse_headers_ok == conn->status);
   conn->status = shttp_message_request_parse_end;
   return _shttp_connection_on_message_complete(conn);

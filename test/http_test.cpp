@@ -39,6 +39,89 @@ TEST(http, simple) {
   WEB_STOP();
 }
 
+TEST(http, async_simple) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_async;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+}
+
+
+TEST(http, async_flush) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_async_flush;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, 10 * RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+}
+
+#define EMPTY_REPONSE "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nContent-Length: 0\r\n\r\n"
+TEST(http, empty_message) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_with_empty;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(EMPTY_REPONSE));
+  ASSERT_EQ( 0, strcmp(buf, EMPTY_REPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+}
+
+TEST(http, async_empty_message) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_with_empty_async;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(EMPTY_REPONSE));
+  ASSERT_EQ( 0, strcmp(buf, EMPTY_REPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+}
+
+
 TEST(http, large_headers) {
   // large_headers will realloc memory while reading headers, and relocate buffers
   WEB_DECL();
@@ -114,8 +197,6 @@ TEST(http, pipeline_request) {
   WEB_STOP();
 }
 
-
-
 TEST(http, send_error_request) {
   WEB_DECL();
   uv_os_sock_t     sock;
@@ -139,8 +220,6 @@ TEST(http, send_error_request) {
   WEB_STOP();
 }
 
-
-
 TEST(http, connections_overflow) {
   WEB_DECL();
   uv_os_sock_t     sock[2];
@@ -158,7 +237,7 @@ TEST(http, connections_overflow) {
 
   overflow = connect_tcp("127.0.0.1", TEST_PORT);
 
-  s = max_recv(overflow, buf, 2048, 1000*RECV_TIMEOUT);
+  s = max_recv(overflow, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, 0);
   closesocket(sock[0]);
   closesocket(sock[1]);
@@ -217,6 +296,33 @@ TEST(http, reuse_connect) {
   WEB_STOP();
 }
 
+TEST(http, async_reuse_connect) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_muti_write_async;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+
+
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+
+  closesocket(sock);
+
+  WEB_STOP();
+}
+
 TEST(http, muti_write) {
   WEB_DECL();
   uv_os_sock_t     sock;
@@ -235,6 +341,80 @@ TEST(http, muti_write) {
 
   WEB_STOP();
 }
+
+TEST(http, async_muti_write) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_muti_write_async;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+}
+
+#ifdef SHTTP_THREAD_SAFE
+TEST(http, async_check_thread_id) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  shttp_assert_ctx = &assert_buf;
+  shttp_assert_cb = &on_assert;
+  settings.callbacks.on_message_complete = &on_message_complete_async_check_thread_self;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  //ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  //ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+  
+  assert_buf.str[assert_buf.len] = 0;
+  ASSERT_STREQ("conn_outgoing(conn).thread_id == uv_thread_self()", assert_buf.str);
+}
+
+
+TEST(http, async_check_writing) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  shttp_set_log_callback(&on_log, &log_buf);
+  shttp_assert_ctx = &assert_buf;
+  shttp_assert_cb = &on_assert;
+  settings.callbacks.on_message_complete = &on_message_complete_async_check_is_writing;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, 20*RECV_TIMEOUT);
+  //ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  //ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+  
+  assert_buf.str[assert_buf.len] = 0;
+  ASSERT_STREQ("0 == shttp_atomic_read32(&conn_outgoing(conn).is_writing)", assert_buf.str);
+}
+#endif
 
 void on_message_send (shttp_connection_t* conn, void *act) {
   usr_context_t *ctx = (usr_context_t*)act;

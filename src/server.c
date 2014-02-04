@@ -22,9 +22,35 @@ void _shttp_connection_on_connect(uv_stream_t* server_handle, int status);
 cstring_t HTTP_CONTENT_HTML = { 9, "text/html"};
 cstring_t HTTP_CONTENT_TEXT = { 10, "text/plain"};
 
+
+static void _shttp_on_listening_close(uv_handle_t* handle) {
+  shttp_listening_t *listening;
+  shttp_t           *http;
+
+  listening = (shttp_listening_t *)handle->data;
+  http = listening->http;
+
+  TAILQ_REMOVE(&http->listenings, listening, next);
+  sl_free(listening);
+}
+
+static void _shttp_close_shutdown_request(uv_handle_t* handle) {
+}
+
+static void _shttp_shutdown(uv_async_t* handle, int status) {
+  shttp_listening_t  *listening;
+  shttp_t            *http;
+
+  http = (shttp_t*)handle->data;
+  TAILQ_FOREACH(listening, &http->listenings, next) {
+    uv_close((uv_handle_t *)&listening->uv_handle, &_shttp_on_listening_close);
+  }
+  uv_close((uv_handle_t *)handle, &_shttp_close_shutdown_request);
+}
+
 DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
-  shttp_t                     *http = NULL;
-  shttp_connection_internal_t *conn = NULL;
+  shttp_t                     *http = nil;
+  shttp_connection_internal_t *conn = nil;
   char                        *ptr;
   size_t                      i = 0;
 
@@ -32,50 +58,50 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
 
   http = (shttp_t*)sl_calloc(1, sizeof(shttp_t));
 
-  if (NULL == http) {
+  if (nil == http) {
     ERR("calloc failed.");
-    return (NULL);
+    return (nil);
   }
 
-  if (NULL == settings) {
+  if (nil == settings) {
     http->settings.timeout.tv_sec = 0;
     http->settings.timeout.tv_usec = 0;
   } else {
     memcpy(&http->settings.timeout, &settings->timeout, sizeof(struct timeval));
   }
 
-  if (NULL == settings || settings->max_headers_count <= 0) {
+  if (nil == settings || settings->max_headers_count <= 0) {
     http->settings.max_headers_count = SHTTP_MAX_HEADER_COUNT;
   } else {
     http->settings.max_headers_count = settings->max_headers_count;
   }
 
-  if (NULL == settings || settings->max_body_size <= 0) {
+  if (nil == settings || settings->max_body_size <= 0) {
     http->settings.max_body_size = UINT64_MAX;
   } else {
     http->settings.max_body_size = settings->max_body_size;
   }
 
-  if (NULL == settings || settings->allowed_methods <= 0) {
+  if (nil == settings || settings->allowed_methods <= 0) {
     http->settings.allowed_methods = SHTTP_REQ_GET | SHTTP_REQ_POST |
                                      SHTTP_REQ_HEAD | SHTTP_REQ_PUT | SHTTP_REQ_DELETE;
   } else {
     http->settings.allowed_methods = settings->allowed_methods;
   }
 
-  if (NULL == settings || settings->max_connections_size <= 0) {
+  if (nil == settings || settings->max_connections_size <= 0) {
     http->settings.max_connections_size = SHTTP_MAX_CONNECTIONS;
   } else {
     http->settings.max_connections_size = settings->max_connections_size;
   }
 
-  if (NULL == settings || settings->user_ctx_size < 0) {
+  if (nil == settings || settings->user_ctx_size < 0) {
     http->settings.user_ctx_size = SHTTP_CTX_SIZE;
   } else {
     http->settings.user_ctx_size = shttp_mem_align(settings->user_ctx_size);
   }
 
-  if (NULL == settings || settings->rw_buffer_size <= 0) {
+  if (nil == settings || settings->rw_buffer_size <= 0) {
     http->settings.rw_buffer_size = SHTTP_RW_BUFFER_SIZE;
   } else {
     http->settings.rw_buffer_size = shttp_align(settings->rw_buffer_size, shttp_pagesize);
@@ -87,6 +113,15 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
 
   memcpy(&http->settings.callbacks, &settings->callbacks, sizeof(shttp_callbacks_t));
   http->uv_loop = uv_loop_new();
+  if(nil == http->uv_loop) {
+    ERR("uv_loop_new failed.");
+    return (nil);
+  }
+  if(0 != uv_async_init(http->uv_loop, &http->shutdown_signal, &_shttp_shutdown)) {
+    ERR("uv_async_init failed.");
+    return (nil);
+  }
+  http->shutdown_signal.data = http;
 
 
   _shttp_parser_init(&http->parser_settings);
@@ -203,51 +238,23 @@ DLL_VARIABLE shttp_res shttp_run(shttp_t *http) {
   return SHTTP_RES_OK;
 }
 
-static void _shttp_on_listening_close(uv_handle_t* handle) {
-  shttp_listening_t *listening;
-  shttp_t           *http;
-
-  listening = (shttp_listening_t *)handle->data;
-  http = listening->http;
-
-  TAILQ_REMOVE(&http->listenings, listening, next);
-  sl_free(listening);
-}
-
-static void _shttp_close_shutdown_request(uv_handle_t* handle) {
-  sl_free((uv_async_t*)handle);
-}
-
-static void _shttp_shutdown(uv_async_t* handle, int status) {
-  shttp_listening_t  *listening;
-  shttp_t            *http;
-
-  http = (shttp_t*)handle->data;
-  TAILQ_FOREACH(listening, &http->listenings, next) {
-    uv_close((uv_handle_t *)&listening->uv_handle, &_shttp_on_listening_close);
-  }
-  uv_close((uv_handle_t *)handle, &_shttp_close_shutdown_request);
-}
-
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *http) {
-  uv_async_t *async;
   int        rc;
 
-  async = (uv_async_t*)sl_malloc(sizeof(uv_async_t));
-  rc = uv_async_init(http->uv_loop, async, &_shttp_shutdown);
+  rc = uv_async_send(&http->shutdown_signal);
   if(0 != rc) {
     ERR("shttp_shutdown: %s", uv_strerror(rc));
-    sl_free(async);
-    return SHTTP_RES_UV;
-  }
-  async->data = http;
-  rc = uv_async_send(async);
-  if(0 != rc) {
-    ERR("shttp_shutdown: %s", uv_strerror(rc));
-    sl_free(async);
     return SHTTP_RES_UV;
   }
   return SHTTP_RES_OK;
+}
+
+DLL_VARIABLE void shttp_set_context(shttp_t *http, void *ctx) {
+  http->context = ctx;
+}
+
+DLL_VARIABLE void * shttp_get_context(shttp_t *http) {
+  return http->context;
 }
 
 #ifdef __cplusplus

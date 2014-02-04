@@ -7,6 +7,10 @@
 extern "C" {
 #endif
 
+  
+void              *shttp_assert_ctx = nil;
+shttp_assert_cb_t  shttp_assert_cb = nil;
+
 static void* __shttp_log_ctx = nil;
 static shttp_log_cb_t __shttp_log_printf_fn = nil;
 

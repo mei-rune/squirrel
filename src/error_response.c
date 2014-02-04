@@ -21,7 +21,7 @@ static void _on_error_message_writed(uv_write_t* req, int status) {
   on_disconnect = (uv_close_cb)req->data;
   conn = (shttp_connection_internal_t*)req->handle->data;
 
-  assert(0 == conn_outgoing(conn).head_write_buffers.length);
+  shttp_assert(0 == conn_outgoing(conn).head_write_buffers.length);
   conn_outgoing(conn).body_write_buffers.length = 0;
   _shttp_response_call_hooks_after_writed(conn);
   if (status < 0) {
@@ -31,7 +31,6 @@ static void _on_error_message_writed(uv_write_t* req, int status) {
 }
 
 void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
-                                        void (*on_disconnect)(uv_handle_t* handle),
                                         const char* message_str,
                                         size_t message_len) {
   int rc;
@@ -42,7 +41,7 @@ void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
   conn_outgoing(conn).body_write_buffers.array[0].len = (ULONG)message_len;
   conn_outgoing(conn).body_write_buffers.length = 1;
 
-  conn_outgoing(conn).write_req.data = on_disconnect;
+  conn_outgoing(conn).write_req.data = &_shttp_connection_on_disconnect;
   rc = uv_write(&conn_outgoing(conn).write_req,
                 (uv_stream_t*)&conn->uv_handle,
                 &conn_outgoing(conn).body_write_buffers.array[0],
@@ -50,14 +49,13 @@ void _shttp_response_send_error_message(shttp_connection_internal_t *conn,
                 _on_error_message_writed);
   if(0 != rc) {
     ERR("write: %s", uv_strerror(rc));
-    uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
+    uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     return;
   }
 }
 
 
 void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn,
-    uv_close_cb on_disconnect,
     const char  *fmt,
     ...) {
   int                                  res;
@@ -74,16 +72,17 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
   res = vsnprintf(buf, buf_len, fmt, args);
   if(-1 == res) {
     ERR("write: format message failed, %s", strerror(errno));
-    uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
+    uv_close((uv_handle_t*) &conn->uv_handle, 
+      &_shttp_connection_on_disconnect);
     sl_free(buf);
     va_end(args);
     return;
   }
 
-  assert(0 == conn_outgoing(conn).call_after_completed.length);
-  assert(0 == conn_outgoing(conn).call_after_data_writed.length);
-  assert(0 == conn_outgoing(conn).head_write_buffers.length);
-  assert(0 == conn_outgoing(conn).body_write_buffers.length);
+  shttp_assert(0 == conn_outgoing(conn).call_after_completed.length);
+  shttp_assert(0 == conn_outgoing(conn).call_after_data_writed.length);
+  shttp_assert(0 == conn_outgoing(conn).head_write_buffers.length);
+  shttp_assert(0 == conn_outgoing(conn).body_write_buffers.length);
 
   conn_outgoing(conn).body_write_buffers.array[0].base = buf;
   conn_outgoing(conn).body_write_buffers.array[0].len = res;
@@ -93,7 +92,7 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
   conn_outgoing(conn).call_after_data_writed.array[0].data = buf;
   conn_outgoing(conn).call_after_data_writed.length = 1;
 
-  conn_outgoing(conn).write_req.data = on_disconnect;
+  conn_outgoing(conn).write_req.data = &_shttp_connection_on_disconnect;
   res = uv_write(&conn_outgoing(conn).write_req,
                  (uv_stream_t*)&conn->uv_handle,
                  &conn_outgoing(conn).body_write_buffers.array[0],
@@ -101,7 +100,7 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
                  _on_error_message_writed);
   if(0 != res) {
     ERR("write: %s", uv_strerror(res));
-    uv_close((uv_handle_t*) &conn->uv_handle, on_disconnect);
+    uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
     va_end(args);
     return;
   }

@@ -220,7 +220,7 @@ static inline uv_os_sock_t create_tcp_socket(void) {
   return sock;
 }
 
-#define GET_REQUEST "GET /favicon.ico HTTP/1.1\r\n" \
+#define GET_REQUEST "GET /abc.ico HTTP/1.1\r\n" \
                   "Host: 0.0.0.0=5000\r\n"          \
                   "User-Agent: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9) Gecko/2008061015 Firefox/3.0\r\n" \
                   "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"                  \
@@ -255,6 +255,14 @@ static inline void on_write_second(shttp_connection_t* conn, void* act) {
   ctx->data2 = act;
 }
 
+void on_assert(void* ctx, const char* msg, const char* file, int line) {
+  sbuffer_t *s;
+  s = (sbuffer_t*)ctx;
+  s->len = strlen(msg);
+  s->len = (s->len >= s->capacity)? s->capacity : s->len;
+  strncpy(s->str, msg, s->len);
+}
+
 static inline void on_log(void* ctx, int severity, const char *fmt, va_list ap) {
   sbuffer_t *s;
   s = (sbuffer_t*)ctx;
@@ -282,6 +290,12 @@ static inline int  on_message_complete (shttp_connection_t* conn) {
 
 
 
+static inline int  on_message_complete_with_empty (shttp_connection_t* conn) {
+  shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_end(conn);
+  return 0;
+}
+
 static inline int  on_message_complete_muti_write(shttp_connection_t* conn) {
   usr_context_t *ctx = (usr_context_t*)conn->ctx;
   ctx->status = 0;
@@ -291,6 +305,114 @@ static inline int  on_message_complete_muti_write(shttp_connection_t* conn) {
   shttp_response_write(conn, HELLO_WORLD, strlen(HELLO_WORLD) -3, on_write_frist,  nil);
   shttp_response_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
   shttp_response_end(conn);
+  return 0;
+}
+
+static inline void async_write_empty_response(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_async_end(conn, nil, nil);
+}
+
+static inline void async_write_response(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
+  shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
+  shttp_response_async_end(conn, nil, nil);
+}
+
+static inline int  on_message_complete_async (shttp_connection_t* conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);  
+  uv_thread_create(&tid, &async_write_response, conn);
+  return 0;
+}
+
+static inline int on_message_complete_with_empty_async(shttp_connection_t *conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);  
+  uv_thread_create(&tid, &async_write_empty_response, conn);
+  return 0;
+}
+
+static inline void muti_async_write_response(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
+  shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD) -3, on_write_frist,  nil);
+  shttp_response_async_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
+  shttp_response_async_end(conn, nil, nil);
+}
+
+static inline void async_write_response_no_start(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+  shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
+  shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
+  shttp_response_async_end(conn, nil, nil);
+}
+
+static inline int on_message_complete_muti_write_async(shttp_connection_t* conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);  
+  uv_thread_create(&tid, &muti_async_write_response, conn);
+  return 0;
+}
+
+static inline int  on_message_complete_async_check_thread_self(shttp_connection_t* conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  uv_thread_create(&tid, &async_write_response_no_start, conn);
+#ifdef _WIN32
+  Sleep(1000);
+#else
+  sleep(1);
+#endif
+  shttp_response_async_end(conn, nil, nil);
+  return 0;
+}
+
+static inline void  async_check_is_writing(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+  shttp_response_set_async(conn);
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), on_write_frist,  nil);
+  shttp_response_async_flush(conn, nil, nil);
+  shttp_response_async_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
+#ifdef _WIN32
+  Sleep(500);
+#else
+  sleep(1);
+#endif
+  shttp_response_async_end(conn, nil, nil);
+}
+static inline int  on_message_complete_async_check_is_writing(shttp_connection_t* conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);  
+  uv_thread_create(&tid, &async_check_is_writing, conn);
+  return 0;
+}
+
+static inline void async_write_async_flush(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
+  shttp_response_async_flush(conn, nil, nil);
+#ifdef _WIN32
+  Sleep(400);
+#else
+  sleep(1);
+#endif
+  shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
+  shttp_response_async_end(conn, nil, nil);
+}
+
+static inline int on_message_complete_async_flush(shttp_connection_t *conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);  
+  uv_thread_create(&tid, &async_write_async_flush, conn);
   return 0;
 }
 
@@ -326,13 +448,18 @@ static inline uv_os_sock_t connect_tcp(const char* remote, int port) {
 #define WEB_DECL()                                                 \
   shttp_settings_t settings;                                       \
   shttp_t          *srv;                                           \
-  char             log_mem[1024];                                  \
+  char             log_mem[1025];                                  \
+  char             assert_mem[1025];                               \
   sbuffer_t        log_buf;                                        \
+  sbuffer_t        assert_buf;                                     \
   uv_thread_t      tid
 
 #define WEB_INIT()                                                 \
   sbuffer_init(log_buf, log_mem, 0, 1024);                         \
+  sbuffer_init(assert_buf, assert_mem, 0, 1024);                   \
   shttp_set_log_callback(nil, nil);                                \
+  shttp_assert_ctx = nil;                                          \
+  shttp_assert_cb = nil;                                           \
   memset(&settings, 0, sizeof(shttp_settings_t));                  \
   settings.user_ctx_size = sizeof(usr_context_t);                  \
   settings.callbacks.on_message_begin = &on_message_begin;         \

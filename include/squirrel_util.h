@@ -161,8 +161,12 @@ typedef int boolean;
 #define shttp_timerisset(tvp) ((tvp)->tv_sec || (tvp)->tv_usec)
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef _WIN32
-DLL_VARIABLE_C int shttp_gettimeofday(struct timeval *tv, struct timezone *tz);
+DLL_VARIABLE int shttp_gettimeofday(struct timeval *tv, struct timezone *tz);
 #else
 #define shttp_gettimeofday  gettimeofday
 #endif
@@ -180,12 +184,27 @@ void _shttp_log_data(const char* data, size_t len, const char* fmt, ...);
 extern void _shttp_log_printf(int severity, const char *fmt, ...);
 
 
+typedef void (*shttp_assert_cb_t)(void* ctx, const char* msg, const char* file, int line);
+extern void              *shttp_assert_ctx;
+extern shttp_assert_cb_t  shttp_assert_cb;
+
+#define shttp_assert_for_cb(x) do{ if(nil == shttp_assert_cb) { assert(x); } else { if(!(x)) { shttp_assert_cb(shttp_assert_ctx, #x, __FILE__, __LINE__); } } } while(0)
+#ifdef DEBUG
+ #define shttp_assert(x) shttp_assert_for_cb(x)
+#else
+ #define shttp_assert(x)
+#endif
 
 extern int shttp_win32_version;
 extern int shttp_ncpu;
 extern int shttp_cacheline_size;
 extern int shttp_pagesize;
 extern int shttp_pagesize_shift;
-DLL_VARIABLE_C void os_init();
+DLL_VARIABLE void os_init();
+
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif //_INTERNAL_H_

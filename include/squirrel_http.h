@@ -256,8 +256,8 @@ struct shttp_response_s {
 
 struct shttp_connection_s {
   shttp_t           *http;
-  shttp_request_t   request;
-  shttp_response_t  response;
+  shttp_request_t    request;
+  shttp_response_t   response;
   spool_t           *pool;
   void              *ctx;
   void              *internal;
@@ -295,6 +295,8 @@ typedef int                                        shttp_res;
 #define SHTTP_RES_RESPONSE_BODY_IS_EMPTY            -18
 #define SHTTP_RES_RESPONSE_ALREADY_END              -19
 #define SHTTP_RES_INVALID_PARAMETERS                -20
+#define SHTTP_RES_NOT_ASYNC                         -21
+#define SHTTP_RES_THREAD_SAFE                       -22
 /**@}*/
 
 #define SHTTP_DELIMITER_STR ": "
@@ -320,6 +322,9 @@ DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char 
 DLL_VARIABLE shttp_res shttp_run(shttp_t *server);
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
 DLL_VARIABLE void shttp_free(shttp_t *server);
+
+DLL_VARIABLE void shttp_set_context(shttp_t *http, void *ctx);
+DLL_VARIABLE void * shttp_get_context(shttp_t *http);
 /**@}*/
 
 
@@ -372,26 +377,47 @@ DLL_VARIABLE shttp_res shttp_response_call_after_completed(shttp_connection_t *c
     shttp_write_cb cb, void *cb_data);
 
 DLL_VARIABLE shttp_res shttp_response_start(shttp_connection_t *conn,
-    uint16_t status,
-    const char *content_type,
-    size_t content_type_len);
+    uint16_t status, const char *content_type, size_t content_type_len);
+DLL_VARIABLE shttp_res shttp_response_set_async(shttp_connection_t *conn);
 DLL_VARIABLE shttp_res shttp_response_set_chuncked(shttp_connection_t *conn);
 DLL_VARIABLE shttp_res shttp_response_write_header(shttp_connection_t *conn,
-    const char *key,
-    size_t     key_len,
-    const char *value,
-    size_t     value_len);
-DLL_VARIABLE shttp_res shttp_response_write_header_format(shttp_connection_t *conn,
-    const char *key,
-    size_t     key_len,
-    const char *fmt,
-    ...);
+    const char *key, size_t key_len, const char *value, size_t value_len);
+DLL_VARIABLE shttp_res shttp_response_format_header(shttp_connection_t *conn,
+    const char *key, size_t key_len, const char *fmt, ...);
+DLL_VARIABLE shttp_res shttp_response_vformat_header(shttp_connection_t *conn,
+    const char *key, size_t key_len, const char *fmt, va_list args);
 DLL_VARIABLE shttp_res shttp_response_write(shttp_connection_t *conn,
-    const char *data,
-    size_t length,
-    shttp_write_cb cb,
-    void *cb_data);
+    const char *data, size_t length, shttp_write_cb cb, void *cb_data);
+DLL_VARIABLE shttp_res shttp_response_write_copy(shttp_connection_t *conn,
+    const char *data, size_t length);
+DLL_VARIABLE shttp_res shttp_response_format(shttp_connection_t *external,
+    const char *fmt, ...);
+DLL_VARIABLE shttp_res shttp_response_vformat(shttp_connection_t *external,
+    const char *fmt, va_list args);
 DLL_VARIABLE shttp_res shttp_response_end(shttp_connection_t *conn);
+
+
+DLL_VARIABLE shttp_res shttp_response_set_async(shttp_connection_t *conn);
+DLL_VARIABLE shttp_res shttp_response_async_start(shttp_connection_t *conn,
+    uint16_t status, const char *content_type, size_t content_type_len);
+DLL_VARIABLE shttp_res shttp_response_async_flush(shttp_connection_t *conn, 
+    shttp_write_cb cb, void* cb_data);
+DLL_VARIABLE shttp_res shttp_response_async_write_header(shttp_connection_t *conn,
+    const char *key, size_t key_len, const char *value, size_t     value_len);
+DLL_VARIABLE shttp_res shttp_response_async_format_header(shttp_connection_t *conn,
+    const char *key, size_t key_len, const char *fmt, ...);
+DLL_VARIABLE shttp_res shttp_response_async_vformat_header(shttp_connection_t *conn,
+    const char *key, size_t key_len, const char *fmt, va_list     args);
+DLL_VARIABLE shttp_res shttp_response_async_write(shttp_connection_t *conn,
+    const char *data, size_t length, shttp_write_cb cb, void *cb_data);
+DLL_VARIABLE shttp_res shttp_response_async_write_copy(shttp_connection_t *conn,
+    const char *data, size_t length);
+DLL_VARIABLE shttp_res shttp_response_async_format(shttp_connection_t *external,
+    const char *fmt, ...);
+DLL_VARIABLE shttp_res shttp_response_async_vformat(shttp_connection_t *external,
+    const char *fmt, va_list args);
+DLL_VARIABLE shttp_res shttp_response_async_end(shttp_connection_t *conn, 
+    shttp_write_cb cb, void* cb_data);
 
 
 static inline void *shttp_response_mem_malloc(shttp_connection_t *conn, size_t size) {
