@@ -40,6 +40,7 @@ void print_handlers(shttp_connection_internal_t* conn) {
 }
 
 void print_connections(shttp_connection_internal_t* conn) {
+  const char                           *type;
   shttp_connection_t                   *external;
   shttp_connection_internal_t          *c;
 
@@ -47,9 +48,25 @@ void print_connections(shttp_connection_internal_t* conn) {
   shttp_response_write_copy(external, "connections:\r\n", 14);
 
   TAILQ_FOREACH(c, &external->http->connections, next) {
-    shttp_response_format(external, "%p (handle=%p, status=%s)\r\n",
+    
+    switch (c->uv_handle.type) {
+#define X(uc, lc) case UV_##uc: type = #lc; break;
+      UV_HANDLE_TYPE_MAP(X)
+#undef X
+    case UV_FILE:
+      type = "file";
+    default:
+      type = "<unknown>";
+    }
+
+    shttp_response_format(external, "%p (handle=\"%p, [%c%c%c] %s\", status=%s, request_status=%s)\r\n",
                     (void*)c,
                     (void*)&(c->uv_handle),
+                    (0 == uv_has_ref((uv_handle_t*)&c->uv_handle))?'-':'R',
+                    (0 == uv_is_active((uv_handle_t*)&c->uv_handle))?'-':'A',
+                    (0 == uv_is_closing((uv_handle_t*)&c->uv_handle))?'-':'C',
+                    type,
+                    _shttp_connection_status_text(conn->status),
                     _shttp_request_status_text(conn_incomming(conn).status));
   }
 }
