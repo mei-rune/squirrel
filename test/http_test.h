@@ -304,14 +304,14 @@ static inline int  on_message_complete_muti_write(shttp_connection_t* conn) {
   shttp_response_write_header(conn, "abc", 3, "abc", 3);
   shttp_response_write(conn, HELLO_WORLD, strlen(HELLO_WORLD) -3, on_write_frist,  nil);
   shttp_response_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
-  shttp_response_end(conn);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
   return 0;
 }
 
 static inline void async_write_empty_response(void *act) {
   shttp_connection_t* conn = (shttp_connection_t*)act;
   shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
 }
 
 static inline void async_write_response(void *act) {
@@ -319,7 +319,7 @@ static inline void async_write_response(void *act) {
   shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
   shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
 }
 
 static inline int  on_message_complete_async (shttp_connection_t* conn) {
@@ -343,14 +343,14 @@ static inline void muti_async_write_response(void *act) {
   shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
   shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD) -3, on_write_frist,  nil);
   shttp_response_async_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
 }
 
 static inline void async_write_response_no_start(void *act) {
   shttp_connection_t* conn = (shttp_connection_t*)act;
   shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
   shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_THREAD_SAFE == shttp_response_async_end(conn, nil, nil));
 }
 
 static inline int on_message_complete_muti_write_async(shttp_connection_t* conn) {
@@ -370,7 +370,7 @@ static inline int  on_message_complete_async_check_thread_self(shttp_connection_
 #else
   sleep(1);
 #endif
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
   return 0;
 }
 
@@ -379,6 +379,7 @@ static inline void  async_check_is_writing(void *act) {
   shttp_response_set_async(conn);
   shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), on_write_frist,  nil);
+  shttp_response_set_chuncked(conn);
   shttp_response_async_flush(conn, nil, nil);
   shttp_response_async_write(conn, HELLO_WORLD + (strlen(HELLO_WORLD) -3), 3, on_write_second, nil);
 #ifdef _WIN32
@@ -386,7 +387,7 @@ static inline void  async_check_is_writing(void *act) {
 #else
   sleep(1);
 #endif
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
 }
 static inline int  on_message_complete_async_check_is_writing(shttp_connection_t* conn) {
   uv_thread_t tid;
@@ -406,7 +407,7 @@ static inline void async_write_async_flush(void *act) {
   sleep(1);
 #endif
   shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
-  shttp_response_async_end(conn, nil, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
 }
 
 static inline int on_message_complete_async_flush(shttp_connection_t *conn) {
@@ -415,6 +416,22 @@ static inline int on_message_complete_async_flush(shttp_connection_t *conn) {
   uv_thread_create(&tid, &async_write_async_flush, conn);
   return 0;
 }
+
+static inline void async_pipeline_request(void *act) {
+  shttp_connection_t* conn = (shttp_connection_t*)act;
+  shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
+  shttp_response_async_write(conn, HELLO_WORLD, strlen(HELLO_WORLD), &on_write_frist, nil);
+  assert(SHTTP_RES_OK == shttp_response_async_end(conn, nil, nil));
+}
+
+static inline int on_message_complete_with_async_pipeline_request(shttp_connection_t *conn) {
+  uv_thread_t tid;
+  shttp_response_set_async(conn);  
+  uv_thread_create(&tid, &async_pipeline_request, conn);
+  return 0;
+}
+
 
 
 static inline void start_web(void *arg) {

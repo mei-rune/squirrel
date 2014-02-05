@@ -195,6 +195,10 @@ static inline void _shttp_connection_restart_read_request(shttp_connection_inter
   }
 }
 
+void _shttp_connection_on_request_completed(shttp_connection_internal_t* conn) {
+    _shttp_response_on_completed(conn, 0);
+    _shttp_connection_restart_read_request(conn);
+}
 
 static void _shttp_flush_signal_on_close(uv_handle_t* handle) {
   shttp_connection_internal_t *conn;
@@ -236,8 +240,7 @@ void _shttp_connection_on_head_writed(uv_write_t* req, int status) {
   
   if(0 != conn_outgoing(conn).is_body_end &&
     0 == conn_outgoing(conn).body_write_buffers.length) {
-    _shttp_response_on_completed(conn, 0);
-    _shttp_connection_restart_read_request(conn);
+    _shttp_connection_on_request_completed(conn);
     return;
   }
 
@@ -257,8 +260,7 @@ void _shttp_connection_on_data_writed(uv_write_t* req, int status) {
   }
 
   if(0 != conn_outgoing(conn).is_body_end) {
-    _shttp_response_on_completed(conn, 0);
-    _shttp_connection_restart_read_request(conn);
+    _shttp_connection_on_request_completed(conn);
     return;
   }
 

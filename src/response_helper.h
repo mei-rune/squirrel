@@ -706,6 +706,10 @@ static inline void _shttp_response_send_immediate(shttp_connection_internal_t *c
   conn_outgoing(conn).write_req.data = cb;
   if(0 == conn_outgoing(conn).head_write_buffers.length) {
     if(0 == conn_outgoing(conn).body_write_buffers.length) {
+      if(0 != conn_outgoing(conn).is_body_end) {
+    _shttp_connection_on_request_completed(conn);
+        return;
+      }
       if(0 != async) {
         shttp_atomic_set32(&conn_outgoing(conn).is_writing, 0);
         return;

@@ -223,6 +223,7 @@ struct shttp_s {
 static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf);
 static void _shttp_connection_on_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf);
 
+void _shttp_connection_on_request_completed(shttp_connection_internal_t* conn);
 void _shttp_connection_on_data_writed(uv_write_t* req, int status);
 void _shttp_connection_on_head_writed(uv_write_t* req, int status);
 void _shttp_connection_on_disconnect(uv_handle_t* handle);

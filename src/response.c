@@ -265,6 +265,10 @@ DLL_VARIABLE shttp_res shttp_response_async_flush(shttp_connection_t *external, 
   shttp_connection_internal_t   *conn;
   conn = to_internal(external);
   IS_THREAD_SAFE(conn);
+  if(0 == conn_response(conn).chunked) {
+    ERR("callback: chunked must is true while body is not completed.");
+    return SHTTP_RES_BODY_NOT_COMPLETE;
+  }
   return _shttp_response_async_flush_helper(to_internal(external), cb, cb_data);
 }
 
