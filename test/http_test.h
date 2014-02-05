@@ -230,8 +230,18 @@ static inline uv_os_sock_t create_tcp_socket(void) {
                   "Keep-Alive: 300\r\n"                                                                          \
                   "Connection: keep-alive\r\n"
 
+#define HEAD_ABC "0123456789"
+#define HEAD_ABC_X_5   HEAD_ABC HEAD_ABC HEAD_ABC HEAD_ABC HEAD_ABC
+#define HEAD_ABC_X_10  HEAD_ABC_X_5 HEAD_ABC_X_5
+#define HEAD_ABC_X_20  HEAD_ABC_X_10 HEAD_ABC_X_10
+#define HEAD_ABC_X_50  HEAD_ABC_X_10 HEAD_ABC_X_10 HEAD_ABC_X_10 HEAD_ABC_X_10 HEAD_ABC_X_10 HEAD_ABC_X_10
+#define HEAD_ABC_X_100 HEAD_ABC_X_50 HEAD_ABC_X_50
 
 #define HELLO_WORLD "<html><body>HELLO WORLD!!!</body></html>"
+#define HELLO_WORLD_X_5   HELLO_WORLD HELLO_WORLD HELLO_WORLD HELLO_WORLD HELLO_WORLD
+#define HELLO_WORLD_X_10  HELLO_WORLD_X_5 HELLO_WORLD_X_5
+#define HELLO_WORLD_X_50  HELLO_WORLD_X_10 HELLO_WORLD_X_10 HELLO_WORLD_X_10 HELLO_WORLD_X_10 HELLO_WORLD_X_10 HELLO_WORLD_X_10
+#define HELLO_WORLD_X_100 HELLO_WORLD_X_50 HELLO_WORLD_X_50
 
 extern const char *simple_request;
 extern const char *pipeline_requests;
@@ -289,6 +299,28 @@ static inline int  on_message_complete (shttp_connection_t* conn) {
 }
 
 
+static inline int  on_message_complete_format (shttp_connection_t* conn) {
+  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  ctx->status = 0;
+  shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_format_header(conn, "abc", 3, "%s", "abc");
+  shttp_response_write_copy(conn, HELLO_WORLD, strlen(HELLO_WORLD) -10);
+  shttp_response_format(conn, "%s", HELLO_WORLD + (strlen(HELLO_WORLD) -10));
+  shttp_response_end(conn);
+  return 0;
+}
+
+static inline int  on_message_complete_format_realloc (shttp_connection_t* conn) {
+  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  ctx->status = 0;
+  shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
+  shttp_response_format_header(conn, "abc", 3, "%s", HEAD_ABC_X_20 HEAD_ABC_X_10 HEAD_ABC_X_5);
+  shttp_response_format(conn,  "%s", HELLO_WORLD);
+  shttp_response_write_copy(conn, HELLO_WORLD, strlen(HELLO_WORLD));
+  shttp_response_format(conn, "%s", HELLO_WORLD_X_50);
+  shttp_response_end(conn);
+  return 0;
+}
 
 static inline int  on_message_complete_with_empty (shttp_connection_t* conn) {
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);

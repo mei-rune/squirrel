@@ -310,10 +310,8 @@ retry:
 mem_copy_begin:
   new_capacity = sbuffer_unused_size(conn_outgoing(conn).head_buffer);
   p = sbuffer_unused_addr(conn_outgoing(conn).head_buffer);
-  memcpy(p, key, key_len);
-  head_buffer_append_delimiter(p + key_len);
   res = vsnprintf(p + key_len + SHTTP_DELIMITER_LEN,
-                  new_capacity -key_len - SHTTP_DELIMITER_LEN, fmt, args);
+                  new_capacity - key_len - SHTTP_DELIMITER_LEN - SHTTP_CRLF_LEN, fmt, args);
   if(-1 == res) {
     if(tried) {
       return SHTTP_RES_PRINTF;
@@ -322,27 +320,25 @@ mem_copy_begin:
     estimate_length = key_len + SHTTP_DELIMITER_LEN + vscprintf(fmt, args) + SHTTP_CRLF_LEN;
     goto retry;
   }
-
-  do_predefine_headers(conn, key, key_len, p + key_len + SHTTP_DELIMITER_LEN, res);
-
-  estimate_length = key_len + SHTTP_DELIMITER_LEN + res + SHTTP_CRLF_LEN;
-  if(new_capacity >= estimate_length) {
-    if(tried) {
-      return SHTTP_RES_PRINTF;
-    }
-    tried = true;
-    estimate_length = key_len + SHTTP_DELIMITER_LEN + vscprintf(fmt, args) + SHTTP_CRLF_LEN;
-    goto retry;
-  }
-  head_buffer_append_crlf(p + key_len + SHTTP_DELIMITER_LEN + res);
-  sbuffer_length_add(conn_outgoing(conn).head_buffer, estimate_length);
-
+  do_predefine_headers(conn, key, key_len, 
+    p + key_len + SHTTP_DELIMITER_LEN, res);
+  
   conn_response_last_header(conn).key.str = p;
   conn_response_last_header(conn).key.len = key_len;
-  conn_response_last_header(conn).val.str = p + key_len + SHTTP_DELIMITER_LEN;
+  memcpy(p, key, key_len);
+  p += key_len;
+  head_buffer_append_delimiter(p);
+  p += SHTTP_DELIMITER_LEN;
+  p += res;
+  conn_response_last_header(conn).val.str = p;
   conn_response_last_header(conn).val.len = res;
+  head_buffer_append_crlf(p);
+  p += SHTTP_CRLF_LEN;
 
+  sbuffer_length_add(conn_outgoing(conn).head_buffer, 
+    p - sbuffer_unused_addr(conn_outgoing(conn).head_buffer) );
   conn_response(conn).headers.length += 1;
+
   return SHTTP_RES_OK;
 }
 
@@ -499,7 +495,7 @@ static inline shttp_res _shttp_response_write_copy_helper(shttp_connection_inter
   
 
   if(nil != conn_outgoing(conn).body_buffer.str &&
-    conn_outgoing(conn).body_buffer.str != last_buffer(conn).base) {
+    conn_outgoing(conn).body_buffer.str == last_buffer(conn).base) {
 
     if(length <= sbuffer_unused_size(conn_outgoing(conn).body_buffer)) {
       goto mem_copy;
@@ -555,17 +551,17 @@ static inline shttp_res _shttp_response_vformat_helper(shttp_connection_internal
   #define conn_buffer(conn) conn_outgoing(conn).body_write_buffers
   #define last_buffer(conn) conn_buffer(conn).array[conn_buffer(conn).length - 1]
 
-  length = spool_excepted(strlen(fmt) + 256);
+  length = strlen(fmt) + 64;
   retries = 0;
 
 try_malloc:
   if(nil != conn_outgoing(conn).body_buffer.str &&
-    conn_outgoing(conn).body_buffer.str != last_buffer(conn).base) {
+    conn_outgoing(conn).body_buffer.str == last_buffer(conn).base) {
 
     if(length <= sbuffer_unused_size(conn_outgoing(conn).body_buffer)) {
       goto mem_copy;
     }
-
+    length = shttp_align(sl_max(length, 256), 256);
     if(nil != (char*)conn_response_try_realloc(conn,
       conn_outgoing(conn).body_buffer.str,
       conn_outgoing(conn).body_buffer.capacity + length)) {
@@ -574,7 +570,7 @@ try_malloc:
     }
   }
   
-  conn_outgoing(conn).body_buffer.capacity = spool_excepted(length);
+  conn_outgoing(conn).body_buffer.capacity = spool_excepted(sl_max(length, 256));
   conn_outgoing(conn).body_buffer.str = (char*)conn_response_malloc(conn,
     conn_outgoing(conn).body_buffer.capacity);
   if(nil == conn_outgoing(conn).body_buffer.str) {
@@ -586,7 +582,7 @@ try_malloc:
     if(0 != retries) {
       return SHTTP_RES_PRINTF;
     }
-    length = spool_excepted(vscprintf(fmt, args) + 32);
+    length = spool_excepted(vscprintf(fmt, args) + 64);
     retries ++;
     goto try_malloc;
   }
@@ -610,7 +606,7 @@ mem_copy:
     if(0 != retries) {
       return SHTTP_RES_PRINTF;
     }
-    length = spool_excepted(vscprintf(fmt, args) + 32);
+    length = spool_excepted(vscprintf(fmt, args) + 64);
     retries ++;
     goto try_malloc;
   }
