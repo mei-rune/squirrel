@@ -81,6 +81,7 @@ extern "C" {
 #define ASSERT_STRNCMP(a, b, n)    CHECK(0 == strncmp(a, b, n))
 
 #define CHECK_ERR(invocation)      PCHECK((invocation) != -1)
+#define TEST_SKIP()                *is_skipped = 1; return
 
 #define LOG_VPRINTF(fmt, argList) do {                                \
     if(0 != out_fn)                                                   \
@@ -160,21 +161,21 @@ extern "C" {
 
 
 
-
 typedef void (__cdecl *out_fn_t)(const char* buf, size_t len);
+typedef void (__cdecl *func_t)(out_fn_t fn, int *is_skipped);
 
 #define UNITTEST_TO_STR(x) #x
 
 #ifdef _DEBUG
 
 #define TEST(a, b)                                                    \
-void __cdecl test_##a##_##b##_run(out_fn_t out_fn);                   \
+void __cdecl test_##a##_##b##_run(out_fn_t out_fn, int *is_skipped);  \
 int test_##a##_##b##_var = ADD_RUN_TEST(UNITTEST_TO_STR(a##_##b)      \
                  , &test_##a##_##b##_run);                            \
-void __cdecl test_##a##_##b##_run(out_fn_t out_fn)
+void __cdecl test_##a##_##b##_run(out_fn_t out_fn, int *is_skipped)
 
 
-DLL_VARIABLE int ADD_RUN_TEST(const char* nm, void (__cdecl *func)(out_fn_t fn));
+DLL_VARIABLE int ADD_RUN_TEST(const char* nm, func_t func);
 DLL_VARIABLE int RUN_ALL_TESTS(out_fn_t out);
 DLL_VARIABLE int RUN_TEST_BY_NAME(const char* nm, out_fn_t out);
 DLL_VARIABLE int RUN_TEST_BY_CATALOG(const char* nm, out_fn_t out);

@@ -60,25 +60,27 @@ TEST(http, async_simple) {
 }
 
 
-//TEST(http, async_flush) {
-//  WEB_DECL();
-//  uv_os_sock_t     sock;
-//  char             buf[2048];
-//  size_t           s;
-//
-//  WEB_INIT();
-//  settings.callbacks.on_message_complete = &on_message_complete_async_flush;
-//  WEB_START();
-//
-//  sock = connect_tcp("127.0.0.1", TEST_PORT);
-//  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
-//  s = max_recv(sock, buf, 2048, 10 * RECV_TIMEOUT);
-//  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-//  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
-//  closesocket(sock);
-//
-//  WEB_STOP();
-//}
+TEST(http, async_flush) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  TEST_SKIP();
+
+  WEB_INIT();
+  settings.callbacks.on_message_complete = &on_message_complete_async_flush;
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
+  s = max_recv(sock, buf, 2048, 10 * RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+
+  WEB_STOP();
+}
 
 #define EMPTY_REPONSE "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html\r\nContent-Length: 0\r\n\r\n"
 TEST(http, empty_message) {

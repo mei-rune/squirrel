@@ -366,7 +366,7 @@ static inline int  on_message_complete_async_check_thread_self(shttp_connection_
   shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   uv_thread_create(&tid, &async_write_response_no_start, conn);
 #ifdef _WIN32
-  Sleep(1000);
+  Sleep(500);
 #else
   sleep(1);
 #endif
@@ -400,7 +400,7 @@ static inline void async_write_async_flush(void *act) {
   shttp_connection_t* conn = (shttp_connection_t*)act;
   shttp_response_async_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_async_write_header(conn, "abc", 3, "abc", 3);
-  shttp_response_async_flush(conn, nil, nil);
+  assert(0 == shttp_response_async_flush(conn, nil, nil));
 #ifdef _WIN32
   Sleep(400);
 #else
