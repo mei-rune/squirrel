@@ -1,6 +1,6 @@
 
 #include "squirrel_config.h"
-#include "squirrel_string.h"
+#include "internal.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -142,6 +142,24 @@ DLL_VARIABLE cstring_t* shttp_status_code_text(int status) {
 #undef XX
   return &UNKNOWN_STATUS_CODE;
 }
+
+#define XX(name, value)     case value: return #name;
+const char * _shttp_connection_status_text(shttp_connection_status_t status) {
+  switch(status) {
+  SHTTP_CONNECTION_STATUS_DEF(XX);
+  default:
+    return "unknown_connection_status";
+  }
+}
+
+const char * _shttp_request_status_text(shttp_request_status_t status) {
+  switch(status) {
+  SHTTP_REQUEST_STATUS_DEF(XX);
+  default:
+    return "unknown_request_status";
+  }
+}
+#undef  XX
 
 #ifdef __cplusplus
 };

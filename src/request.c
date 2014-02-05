@@ -13,8 +13,8 @@ static int _http_request_on_message_begin(http_parser* inner) {
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  shttp_assert(shttp_message_request_parse_none == conn->status);
-  conn->status = shttp_message_request_parse_begin;
+  shttp_assert(shttp_request_none == conn_incomming(conn).status);
+  conn_incomming(conn).status = shttp_request_parse_begin;
   return _shttp_connection_on_message_begin(conn);
 }
 
@@ -22,7 +22,7 @@ static int _http_request_on_status(http_parser *inner, const char *at, size_t le
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  conn->status = shttp_message_request_parse_status;
+  conn_incomming(conn).status = shttp_request_parse_status;
   return 0;
 }
 
@@ -30,18 +30,18 @@ static int _http_request_on_url(http_parser *inner, const char *at, size_t lengt
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  switch (conn->status) {
-  case shttp_message_request_parse_begin:
-    conn->status = shttp_message_request_parse_url;
+  switch (conn_incomming(conn).status) {
+  case shttp_request_parse_begin:
+    conn_incomming(conn).status = shttp_request_parse_url;
     conn_incomming(conn).url.str = at;
     conn_incomming(conn).url.len = length;
     break;
-  case shttp_message_request_parse_url:
+  case shttp_request_parse_url:
     shttp_assert((conn_incomming(conn).url.str + conn_incomming(conn).url.len) == at);
     conn_incomming(conn).url.len += length;
     break;
   default:
-    ERR("parse error: url status is unknown(%d).", conn->status);
+    ERR("parse error: url status is unknown(%d).", conn_incomming(conn).status);
     shttp_assert(false);
     return -1;
   }
@@ -110,18 +110,18 @@ static int _http_request_on_header_field(http_parser *inner, const char *at, siz
   conn = (shttp_connection_internal_t*)inner->data;
 #define current_header conn_incomming(conn).headers.array[conn_incomming(conn).headers.length]
 
-  switch(conn->status) {
-  case shttp_message_request_parse_url:
-    conn->status = shttp_message_request_parse_field;
+  switch(conn_incomming(conn).status) {
+  case shttp_request_parse_url:
+    conn_incomming(conn).status = shttp_request_parse_field;
     current_header.key.str = at;
     current_header.key.len = length;
     break;
-  case shttp_message_request_parse_field:
+  case shttp_request_parse_field:
     shttp_assert((current_header.key.str + current_header.key.len) == at);
     current_header.key.len += length;
     break;
-  case shttp_message_request_parse_value:
-    conn->status = shttp_message_request_parse_field;
+  case shttp_request_parse_value:
+    conn_incomming(conn).status = shttp_request_parse_field;
     conn_incomming(conn).headers.length +=1;
     if(conn_incomming(conn).headers.capacity <= conn_incomming(conn).headers.length) {
       ERR("parse error: header length too large.");
@@ -132,7 +132,7 @@ static int _http_request_on_header_field(http_parser *inner, const char *at, siz
     current_header.key.len = length;
     break;
   default:
-    ERR("parse error: head field status is unknown(%d).", conn->status);
+    ERR("parse error: head field status is unknown(%d).", conn_incomming(conn).status);
     return -1;
   }
   return 0;
@@ -145,18 +145,18 @@ static int _http_request_on_header_value(http_parser *inner, const char *at, siz
 
 #define current_header conn_incomming(conn).headers.array[conn_incomming(conn).headers.length]
 
-  switch(conn->status) {
-  case shttp_message_request_parse_value:
+  switch(conn_incomming(conn).status) {
+  case shttp_request_parse_value:
     shttp_assert((current_header.val.str + current_header.val.len) == at);
     current_header.val.len += length;
     break;
-  case shttp_message_request_parse_field:
-    conn->status = shttp_message_request_parse_value;
+  case shttp_request_parse_field:
+    conn_incomming(conn).status = shttp_request_parse_value;
     current_header.val.str = at;
     current_header.val.len = length;
     break;
   default:
-    ERR("parse error: head value status is unknown(%d).", conn->status);
+    ERR("parse error: head value status is unknown(%d).", conn_incomming(conn).status);
     shttp_assert(false);
     return -1;
   }
@@ -168,7 +168,7 @@ static int _http_request_on_headers_complete(http_parser* inner) {
   int                          rc;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  conn->status = shttp_message_request_parse_headers_ok;
+  conn_incomming(conn).status = shttp_request_parse_headers_ok;
 
   conn_request(conn).headers.array = conn_incomming(conn).headers.array;
   conn_request(conn).headers.length = conn_incomming(conn).headers.length;
@@ -188,9 +188,9 @@ static int _http_request_on_body(http_parser *inner, const char *at, size_t leng
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  shttp_assert(shttp_message_request_parse_body == conn->status ||
-         shttp_message_request_parse_headers_ok == conn->status);
-  conn->status = shttp_message_request_parse_body;
+  shttp_assert(shttp_request_parse_body == conn_incomming(conn).status ||
+         shttp_request_parse_headers_ok == conn_incomming(conn).status);
+  conn_incomming(conn).status = shttp_request_parse_body;
   return _shttp_connection_on_body(conn, at, length);
 }
 
@@ -198,9 +198,9 @@ static int _http_request_on_message_complete(http_parser* inner) {
   shttp_connection_internal_t* conn;
 
   conn = (shttp_connection_internal_t*)inner->data;
-  shttp_assert(shttp_message_request_parse_body == conn->status ||
-         shttp_message_request_parse_headers_ok == conn->status);
-  conn->status = shttp_message_request_parse_end;
+  shttp_assert(shttp_request_parse_body == conn_incomming(conn).status ||
+         shttp_request_parse_headers_ok == conn_incomming(conn).status);
+  conn_incomming(conn).status = shttp_request_parse_end;
   return _shttp_connection_on_message_complete(conn);
 }
 

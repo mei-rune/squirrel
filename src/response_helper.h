@@ -703,7 +703,7 @@ static inline void _shttp_response_send_immediate(shttp_connection_internal_t *c
   if(0 == conn_outgoing(conn).head_write_buffers.length) {
     if(0 == conn_outgoing(conn).body_write_buffers.length) {
       if(0 != conn_outgoing(conn).is_body_end) {
-    _shttp_connection_on_request_completed(conn);
+        _shttp_connection_restart_read_request(conn);
         return;
       }
       if(0 != async) {

@@ -2,15 +2,17 @@
 #include "http_test.h"
 
 
+#define HELLO_WORLD_RESPONSE       "HTTP/1.1 200 OK\r\n"                     \
+                                   "abc: abc\r\n"                            \
+                                   "Connection: keep-alive\r\n"              \
+                                   "Content-Type: text/html\r\n"             \
+                                   "Content-Length: 40\r\n"                  \
+                                   "\r\n"                                    \
+                                   "<html><body>HELLO WORLD!!!</body></html>"
+
 const char *simple_request= GET_REQUEST "\r\n";
 const char *pipeline_requests= GET_REQUEST "\r\n" GET_REQUEST "\r\n";
-const char *HELLO_WORLD_RESPONSE = "HTTP/1.1 200 OK\r\n"
-                                   "abc: abc\r\n"
-                                   "Connection: keep-alive\r\n"
-                                   "Content-Type: text/html\r\n"
-                                   "Content-Length: 40\r\n"
-                                   "\r\n"
-                                   "<html><body>HELLO WORLD!!!</body></html>";
+const char *hello_world_response = HELLO_WORLD_RESPONSE;
 cstring_t HTTP_CONTENT_TEXT_HTML = { 9, "text/html"};
 
 #define HEAD_ABC_X_35_HELLO_WORLD_RESPONSE_X_52  "HTTP/1.1 200 OK\r\n"                    \
@@ -43,8 +45,8 @@ TEST(http, simple) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -63,8 +65,8 @@ TEST(http, format) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -103,8 +105,8 @@ TEST(http, async_simple) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -126,8 +128,8 @@ TEST(http, async_flush) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -195,8 +197,8 @@ TEST(http, large_headers) {
     send_n(sock, "\r\n", 2);
 
     s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-    ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-    ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+    ASSERT_EQ( s, strlen(hello_world_response));
+    ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   }
   closesocket(sock);
 
@@ -230,6 +232,55 @@ TEST(http, headers_count_to_large) {
   WEB_STOP();
 }
 
+
+TEST(http, large_headers_at_second_request) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  shttp_set_log_callback(&on_log, &log_buf);
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  
+  ASSERT_EQ(true, send_n(sock, GET_REQUEST "\r\n" GET_REQUEST HEAD_SIMPLE_X_100 "\r\n",
+    strlen(GET_REQUEST "\r\n" GET_REQUEST HEAD_SIMPLE_X_100 "\r\n")));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, 2*strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE HELLO_WORLD_RESPONSE));
+  closesocket(sock);
+  WEB_STOP();
+}
+
+TEST(http, headers_count_too_large_at_second_request) {
+  WEB_DECL();
+  uv_os_sock_t     sock;
+  char             buf[2048];
+  size_t           s;
+
+  WEB_INIT();
+  shttp_set_log_callback(&on_log, &log_buf);
+  WEB_START();
+
+  sock = connect_tcp("127.0.0.1", TEST_PORT);
+  
+  ASSERT_EQ(true, send_n(sock, GET_REQUEST "\r\n" GET_MINI_REQUEST HEAD_MINI_SIMPLE_X_200 HEAD_MINI_SIMPLE_X_50 HEAD_MINI_SIMPLE_X_10 HEAD_MINI_SIMPLE_X_10 "\r\n",
+    strlen(GET_REQUEST "\r\n" GET_MINI_REQUEST HEAD_MINI_SIMPLE_X_200 HEAD_MINI_SIMPLE_X_50 HEAD_MINI_SIMPLE_X_10 HEAD_MINI_SIMPLE_X_10 "\r\n")));
+  s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
+
+  closesocket(sock);
+
+  WEB_STOP();
+
+  
+  log_buf.str[log_buf.len] = 0;
+  ASSERT_STREQ("parse error: header length too large.", log_buf.str);
+}
+
 TEST(http, pipeline_request) {
   WEB_DECL();
   uv_os_sock_t     sock;
@@ -242,9 +293,9 @@ TEST(http, pipeline_request) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE),
-                        HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf, hello_world_response, strlen(hello_world_response)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(hello_world_response),
+                        hello_world_response, strlen(hello_world_response)));
   closesocket(sock);
 
   WEB_STOP();
@@ -263,9 +314,9 @@ TEST(http, async_pipeline_request) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE),
-                        HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf, hello_world_response, strlen(hello_world_response)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(hello_world_response),
+                        hello_world_response, strlen(hello_world_response)));
   closesocket(sock);
 
   WEB_STOP();
@@ -335,9 +386,9 @@ TEST(http, pipeline_request_while_two_read) {
   ASSERT_EQ(true, send_n(sock, pipeline_requests + (strlen(pipeline_requests)-12), 12));
 
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE),
-                        HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf, hello_world_response, strlen(hello_world_response)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(hello_world_response),
+                        hello_world_response, strlen(hello_world_response)));
   closesocket(sock);
 
   WEB_STOP();
@@ -358,9 +409,9 @@ TEST(http, async_pipeline_request_while_two_read) {
   ASSERT_EQ(true, send_n(sock, pipeline_requests + (strlen(pipeline_requests)-12), 12));
 
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( 0, strncmp(buf, HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
-  ASSERT_EQ( 0, strncmp(buf + strlen(HELLO_WORLD_RESPONSE),
-                        HELLO_WORLD_RESPONSE, strlen(HELLO_WORLD_RESPONSE)));
+  ASSERT_EQ( 0, strncmp(buf, hello_world_response, strlen(hello_world_response)));
+  ASSERT_EQ( 0, strncmp(buf + strlen(hello_world_response),
+                        hello_world_response, strlen(hello_world_response)));
   closesocket(sock);
 
   WEB_STOP();
@@ -380,14 +431,14 @@ TEST(http, reuse_connect) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
 
 
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
 
   closesocket(sock);
 
@@ -408,14 +459,14 @@ TEST(http, async_reuse_connect) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
 
 
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
 
   closesocket(sock);
 
@@ -434,8 +485,8 @@ TEST(http, muti_write) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -454,8 +505,8 @@ TEST(http, async_muti_write) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -477,8 +528,8 @@ TEST(http, async_check_thread_id) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  //ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  //ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  //ASSERT_EQ( s, strlen(hello_world_response));
+  //ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -504,8 +555,8 @@ TEST(http, async_check_writing) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  //ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  //ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  //ASSERT_EQ( s, strlen(hello_world_response));
+  //ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();
@@ -605,11 +656,11 @@ TEST(http, async_end_not_call_with_not_thunked) {
   //ASSERT_EQ(s, strlen(BODY_NOT_COMPLETE));
   //ASSERT_EQ(0, strcmp(buf, BODY_NOT_COMPLETE));
   closesocket(sock);
+  
+  WEB_STOP();
 
   log_buf.str[log_buf.len] = 0;
   ASSERT_STREQ("callback: chunked must is true while body is not completed.", log_buf.str);
-
-  WEB_STOP();
 }
 
 int on_message_begin_with_reply(shttp_connection_t* conn) {
@@ -634,8 +685,8 @@ TEST(http, reply_in_begin) {
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, simple_request, strlen(simple_request)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
-  ASSERT_EQ( s, strlen(HELLO_WORLD_RESPONSE));
-  ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE));
+  ASSERT_EQ( s, strlen(hello_world_response));
+  ASSERT_EQ( 0, strcmp(buf, hello_world_response));
   closesocket(sock);
 
   WEB_STOP();

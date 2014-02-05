@@ -46,10 +46,11 @@ void print_connections(shttp_connection_internal_t* conn) {
   external = &conn_external(conn);
   shttp_response_write_copy(external, "connections:\r\n", 14);
 
-  TAILQ_FOREACH(c, &conn->external.http->connections, next) {
-    shttp_response_format(external, "%p [handle=%p]\r\n",
+  TAILQ_FOREACH(c, &external->http->connections, next) {
+    shttp_response_format(external, "%p (handle=%p, status=%s)\r\n",
                     (void*)c,
-                    (void*)&(c->uv_handle));
+                    (void*)&(c->uv_handle),
+                    _shttp_request_status_text(conn_incomming(conn).status));
   }
 }
 
@@ -81,7 +82,6 @@ int stats_handler(shttp_connection_t* external) {
   shttp_response_end(external);
   return 0;
 }
-
 
 #ifdef __cplusplus
 };

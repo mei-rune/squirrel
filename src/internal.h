@@ -47,25 +47,48 @@ TAILQ_HEAD(shttp_listenings, shttp_listening_s);
 typedef struct shttp_listenings shttp_listenings_t;
 
 
-typedef enum shttp_message_request_parse_status_e {
-  shttp_message_request_parse_none        = 0,
-  shttp_message_request_parse_begin       = 1,
-  shttp_message_request_parse_status      = 2,
-  shttp_message_request_parse_url         = 3,
-  shttp_message_request_parse_field       = 4,
-  shttp_message_request_parse_value       = 5,
-  shttp_message_request_parse_headers_ok  = 6,
-  shttp_message_request_parse_body        = 7,
-  shttp_message_request_parse_end         = 8,
-  shttp_message_response_begin            = 9,
-  shttp_message_response_writing          = 10,
-  shttp_message_response_end              = 11,
+#define SHTTP_REQUEST_STATUS_DEF(XX)              \
+  XX(none,        0)                              \
+  XX(parse_begin,       1)                        \
+  XX(parse_status,      2)                        \
+  XX(parse_url,         3)                        \
+  XX(parse_field,       4)                        \
+  XX(parse_value,       5)                        \
+  XX(parse_headers_ok,  6)                        \
+  XX(parse_body,        7)                        \
+  XX(parse_end,         8)                        \
+  XX(failed,            254)
 
-  shttp_message_failed                    = 255
-} shttp_message_request_parse_status_t;
+typedef enum shttp_request_status_e {
+#define XX(name, value)     shttp_request_##name  = value,
+  SHTTP_REQUEST_STATUS_DEF(XX)
+#undef  XX
+  shttp_request_unknown                   = 255
+} shttp_request_status_t;
 
 
-#define shttp_headers_is_reading(conn)  (shttp_message_request_parse_headers_ok > conn->status)
+#define SHTTP_CONNECTION_STATUS_DEF(XX)             \
+  XX(none,                 0)                       \
+  XX(request_reading,      1)                       \
+  XX(request_parsing,      2)                       \
+  XX(response_creating,    3)                       \
+  XX(response_writing,     4)                       \
+  XX(closing,              5)                       \
+  XX(failed,             254)
+
+typedef enum shttp_connection_status_e {
+#define XX(name, value)     shttp_connection_##name  = value,
+  SHTTP_CONNECTION_STATUS_DEF(XX)
+#undef  XX
+  shttp_connection_unknown                   = 255
+} shttp_connection_status_t;
+
+#define shttp_connection_is_response_processing(status)        \
+   (shttp_connection_response_creating == (status) ||          \
+   shttp_connection_response_writing == (status))
+
+#define shttp_headers_is_reading(conn)                         \
+   (shttp_request_parse_headers_ok > conn_incomming(conn).status)
 
 
 #define shttp_write_buffers_size          32
@@ -110,6 +133,7 @@ typedef struct shttp_incomming_s {
   shttp_kv_array_t                         headers;
 
   // should init while new request is arrived
+  shttp_request_status_t                   status;
   void                                   * headers_block;
   sstring_t                                headers_buf;
   cstring_t                                url;
@@ -174,9 +198,9 @@ typedef struct shttp_connection_internal_s {
 
 
   // should init while new connection is arrived
+  shttp_connection_status_t                status;
   uv_async_t                               flush_signal;
   uv_tcp_t                                 uv_handle;
-  shttp_message_request_parse_status_t     status;
   struct http_parser                       parser;
   shttp_buffer_t                           rd_buf;
 
@@ -223,7 +247,7 @@ struct shttp_s {
 static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf);
 static void _shttp_connection_on_alloc(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf);
 
-void _shttp_connection_on_request_completed(shttp_connection_internal_t* conn);
+void _shttp_connection_restart_read_request(shttp_connection_internal_t* conn);
 void _shttp_connection_on_data_writed(uv_write_t* req, int status);
 void _shttp_connection_on_head_writed(uv_write_t* req, int status);
 void _shttp_connection_on_disconnect(uv_handle_t* handle);
@@ -299,6 +323,8 @@ static inline void _shttp_response_assert_after_response_end(shttp_connection_in
                                  "\t%d"
 
 
+const char * _shttp_connection_status_text(shttp_connection_status_t status);
+const char * _shttp_request_status_text(shttp_request_status_t status);
 void _shttp_status_init();
 int stats_handler(shttp_connection_t* external);
 

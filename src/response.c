@@ -310,9 +310,6 @@ void _shttp_response_on_completed(shttp_connection_internal_t *conn, int status)
 }
 
 void _shttp_response_sync_send(shttp_connection_internal_t *conn) {
-  if(0 != shttp_atomic_read32(&conn_outgoing(conn).is_async)) {
-    return;
-  }
   _shttp_response_send_immediate(conn, &_shttp_response_sync_send, 0);
 }
 
