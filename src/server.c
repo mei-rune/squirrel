@@ -107,6 +107,8 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
     http->settings.rw_buffer_size = shttp_align(settings->rw_buffer_size, shttp_pagesize);
   }
 
+  http->settings.server_context = settings->server_context;
+
   TAILQ_INIT(&http->connections);
   TAILQ_INIT(&http->free_connections);
   TAILQ_INIT(&http->listenings);
@@ -133,14 +135,15 @@ DLL_VARIABLE shttp_t *shttp_create(shttp_settings_t *settings) {
                            (2 * sizeof(shttp_kv_t) * http->settings.max_headers_count) +
                            http->settings.rw_buffer_size);
     conn = (shttp_connection_internal_t*)ptr;
+    conn_external(conn).server_context = settings->server_context;
     conn_external(conn).http = http;
     conn_external(conn).internal = conn;
     conn_external(conn).pool = &conn->pool;
 
     if(0 == http->settings.user_ctx_size) {
-      conn_external(conn).ctx = nil;
+      conn_external(conn).connection_context = nil;
     } else {
-      conn_external(conn).ctx = ptr + shttp_mem_align(sizeof(shttp_connection_internal_t));
+      conn_external(conn).connection_context = ptr + shttp_mem_align(sizeof(shttp_connection_internal_t));
     }
     conn->callbacks = &http->settings.callbacks;
 

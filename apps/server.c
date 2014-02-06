@@ -1,6 +1,6 @@
 
 #include "squirrel_config.h"
-#include "ssh_backend.h"
+#include "server.h"
 
 #ifdef __cplusplus
 extern "C" {

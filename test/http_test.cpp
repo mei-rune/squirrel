@@ -585,7 +585,7 @@ void on_message_send (shttp_connection_t* conn, void *act) {
 }
 
 int on_message_complete_not_thunked(shttp_connection_t* conn) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->status = 0;
   on_message_send(conn, ctx);
   return 0;
@@ -602,7 +602,7 @@ void on_message_send_async (shttp_connection_t* conn, void *act) {
 
 static inline void async_not_thunked(void *act) {
   shttp_connection_t* conn = (shttp_connection_t*)act;
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->status = 0;
   on_message_send_async(conn, ctx);
 }

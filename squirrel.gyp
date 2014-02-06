@@ -306,9 +306,9 @@
       ],
 
       'sources': [
-        'apps/ssh_backend.h',
-        'apps/ssh_backend.c',
-        'apps/ssh.c',
+        'apps/server.h',
+        'apps/server.c',
+        'apps/main.c',
       ],
 
       'copies': [

@@ -165,9 +165,9 @@ struct shttp_settings_s {
    * Bitmask of all HTTP methods that we accept and pass to user
    * callbacks.
    *
-     * If not supported they will generate a "405 Method not allowed" response.
+   * If not supported they will generate a "405 Method not allowed" response.
    *
-     * By default this includes the following methods: GET, POST, HEAD, PUT, DELETE
+   * By default this includes the following methods: GET, POST, HEAD, PUT, DELETE
    */
   uint16_t allowed_methods;
 
@@ -186,6 +186,11 @@ struct shttp_settings_s {
    *
    */
   shttp_callbacks_t callbacks;
+
+  /**
+   * the context of server, indicte the global server object.
+   */
+  void              *server_context;
 };
 
 /**
@@ -259,7 +264,8 @@ struct shttp_connection_s {
   shttp_request_t    request;
   shttp_response_t   response;
   spool_t           *pool;
-  void              *ctx;
+  void              *connection_context;
+  void              *server_context;
   void              *internal;
 };
 
@@ -274,7 +280,7 @@ struct shttp_write_cb_s {
  */
 /**@{*/
 typedef int                                        shttp_res;
-#define SHTTP_RES_OK                                0
+#define SHTTP_RES_OK                                 0
 #define SHTTP_RES_ERROR                             -1
 #define SHTTP_RES_MEMORY                            -2
 #define SHTTP_RES_UV                                -3
@@ -299,12 +305,12 @@ typedef int                                        shttp_res;
 #define SHTTP_RES_THREAD_SAFE                       -22
 /**@}*/
 
-#define SHTTP_DELIMITER_STR ": "
-#define SHTTP_DELIMITER_INT ((uint16_t)0x3a20)
-#define SHTTP_DELIMITER_LEN 2
-#define SHTTP_CRLF_STR      "\r\n"
-#define SHTTP_CRLF_INT      ((uint16_t)0x0d0a)
-#define SHTTP_CRLF_LEN      2
+#define SHTTP_DELIMITER_STR                         ": "
+#define SHTTP_DELIMITER_INT                         ((uint16_t)0x3a20)
+#define SHTTP_DELIMITER_LEN                         2
+#define SHTTP_CRLF_STR                              "\r\n"
+#define SHTTP_CRLF_INT                              ((uint16_t)0x0d0a)
+#define SHTTP_CRLF_LEN                              2
 
 
 /** @name http server methods
@@ -318,13 +324,11 @@ DLL_VARIABLE shttp_t * shttp_create(shttp_settings_t* settings);
 * For TCP networks, addresses have the form host:port. If host is a literal
 * IPv6 address, it must be enclosed in square brackets.
 */
+DLL_VARIABLE void * shttp_get_context(shttp_t *http);
 DLL_VARIABLE shttp_res shttp_listen_at(shttp_t* http, const char *network, char *listen_addr, short port);
 DLL_VARIABLE shttp_res shttp_run(shttp_t *server);
 DLL_VARIABLE shttp_res shttp_shutdown(shttp_t *server);
 DLL_VARIABLE void shttp_free(shttp_t *server);
-
-DLL_VARIABLE void shttp_set_context(shttp_t *http, void *ctx);
-DLL_VARIABLE void * shttp_get_context(shttp_t *http);
 /**@}*/
 
 
@@ -452,8 +456,8 @@ DLL_VARIABLE void shttp_response_pool_free (shttp_connection_t *conn, void *data
 /** @name http utility methods
  */
 /**@{*/
-extern cstring_t HTTP_CONTENT_HTML;
-extern cstring_t HTTP_CONTENT_TEXT;
+DLL_VARIABLE cstring_t HTTP_CONTENT_HTML;
+DLL_VARIABLE cstring_t HTTP_CONTENT_TEXT;
 
 DLL_VARIABLE cstring_t* shttp_status_code_text(int status);
 

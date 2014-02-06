@@ -278,12 +278,12 @@ typedef struct usr_context_s {
 
 
 static inline void on_write_frist(shttp_connection_t* conn, void* act) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->data1 = act;
 }
 
 static inline void on_write_second(shttp_connection_t* conn, void* act) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->data2 = act;
 }
 
@@ -311,7 +311,7 @@ static inline int  on_body (shttp_connection_t* conn, const char *at, size_t len
 }
 
 static inline int  on_message_complete (shttp_connection_t* conn) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->status = 0;
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_write_header(conn, "abc", 3, "abc", 3);
@@ -322,7 +322,7 @@ static inline int  on_message_complete (shttp_connection_t* conn) {
 
 
 static inline int  on_message_complete_format (shttp_connection_t* conn) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->status = 0;
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_format_header(conn, "abc", 3, "%s", "abc");
@@ -333,7 +333,7 @@ static inline int  on_message_complete_format (shttp_connection_t* conn) {
 }
 
 static inline int  on_message_complete_format_realloc (shttp_connection_t* conn) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->status = 0;
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
   shttp_response_format_header(conn, "abc", 3, "%s", HEAD_ABC_X_20 HEAD_ABC_X_10 HEAD_ABC_X_5);
@@ -351,7 +351,7 @@ static inline int  on_message_complete_with_empty (shttp_connection_t* conn) {
 }
 
 static inline int  on_message_complete_muti_write(shttp_connection_t* conn) {
-  usr_context_t *ctx = (usr_context_t*)conn->ctx;
+  usr_context_t *ctx = (usr_context_t*)conn->connection_context;
   ctx->status = 0;
 
   shttp_response_start(conn, 200, HTTP_CONTENT_TEXT_HTML.str, HTTP_CONTENT_TEXT_HTML.len);
