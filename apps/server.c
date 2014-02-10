@@ -5,7 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  
+
 #define POLL_TIMEOUT    1000 *1000 * 1000
 
 
@@ -81,12 +81,12 @@ int  upstream_init(upstream_t* us, const char* name, size_t name_len, size_t que
   int rc;
 
   rc = uv_mutex_init(&us->lock);
-  if(0 != rc){
+  if(0 != rc) {
     ERR("uv_mutex_init: %s.", uv_strerror(rc));
     return rc;
   }
   rc = uv_cond_init(&us->cond);
-  if(0 != rc){
+  if(0 != rc) {
     uv_mutex_destroy(&us->lock);
     ERR("uv_cond_init: %s.", uv_strerror(rc));
     return rc;
@@ -101,11 +101,11 @@ int  upstream_init(upstream_t* us, const char* name, size_t name_len, size_t que
   }
 
   queue_capacity = ((-1 == queue_capacity)?100:queue_capacity);
-  request_ctx_buffer_init(&us->queue, 
-    (request_ctx_t*)sl_malloc(queue_capacity *sizeof(request_ctx_t)),
-    queue_capacity);
+  request_ctx_buffer_init(&us->queue,
+                          (request_ctx_t*)sl_malloc(queue_capacity *sizeof(request_ctx_t)),
+                          queue_capacity);
   rc = uv_thread_create(&us->tid, &upstream_entry, us);
-    if(nil == us->name.str) {
+  if(nil == us->name.str) {
     uv_mutex_destroy(&us->lock);
     uv_cond_destroy(&us->cond);
     ERR("uv_thread_create: %s.", uv_strerror(rc));

@@ -244,9 +244,9 @@ TEST(http, large_headers_at_second_request) {
   WEB_START();
 
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  
+
   ASSERT_EQ(true, send_n(sock, GET_REQUEST "\r\n" GET_REQUEST HEAD_SIMPLE_X_100 "\r\n",
-    strlen(GET_REQUEST "\r\n" GET_REQUEST HEAD_SIMPLE_X_100 "\r\n")));
+                         strlen(GET_REQUEST "\r\n" GET_REQUEST HEAD_SIMPLE_X_100 "\r\n")));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, 2*strlen(hello_world_response));
   ASSERT_EQ( 0, strcmp(buf, HELLO_WORLD_RESPONSE HELLO_WORLD_RESPONSE));
@@ -265,9 +265,9 @@ TEST(http, headers_count_too_large_at_second_request) {
   WEB_START();
 
   sock = connect_tcp("127.0.0.1", TEST_PORT);
-  
+
   ASSERT_EQ(true, send_n(sock, GET_REQUEST "\r\n" GET_MINI_REQUEST HEAD_MINI_SIMPLE_X_200 HEAD_MINI_SIMPLE_X_50 HEAD_MINI_SIMPLE_X_10 HEAD_MINI_SIMPLE_X_10 "\r\n",
-    strlen(GET_REQUEST "\r\n" GET_MINI_REQUEST HEAD_MINI_SIMPLE_X_200 HEAD_MINI_SIMPLE_X_50 HEAD_MINI_SIMPLE_X_10 HEAD_MINI_SIMPLE_X_10 "\r\n")));
+                         strlen(GET_REQUEST "\r\n" GET_MINI_REQUEST HEAD_MINI_SIMPLE_X_200 HEAD_MINI_SIMPLE_X_50 HEAD_MINI_SIMPLE_X_10 HEAD_MINI_SIMPLE_X_10 "\r\n")));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
   ASSERT_EQ( s, strlen(hello_world_response));
   ASSERT_EQ( 0, strcmp(buf, hello_world_response));
@@ -276,7 +276,7 @@ TEST(http, headers_count_too_large_at_second_request) {
 
   WEB_STOP();
 
-  
+
   log_buf.str[log_buf.len] = 0;
   ASSERT_STREQ("parse error: header length too large.", log_buf.str);
 }
@@ -310,7 +310,7 @@ TEST(http, async_pipeline_request) {
   WEB_INIT();
   settings.callbacks.on_message_complete = &on_message_complete_with_async_pipeline_request;
   WEB_START();
-  
+
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)));
   s = max_recv(sock, buf, 2048, RECV_TIMEOUT);
@@ -403,7 +403,7 @@ TEST(http, async_pipeline_request_while_two_read) {
   WEB_INIT();
   settings.callbacks.on_message_complete = &on_message_complete_with_async_pipeline_request;
   WEB_START();
-  
+
   sock = connect_tcp("127.0.0.1", TEST_PORT);
   ASSERT_EQ(true, send_n(sock, pipeline_requests, strlen(pipeline_requests)-12));
   ASSERT_EQ(true, send_n(sock, pipeline_requests + (strlen(pipeline_requests)-12), 12));
@@ -533,7 +533,7 @@ TEST(http, async_check_thread_id) {
   closesocket(sock);
 
   WEB_STOP();
-  
+
   assert_buf.str[assert_buf.len] = 0;
   ASSERT_STREQ("conn_outgoing(conn).thread_id == uv_thread_self()", assert_buf.str);
 }
@@ -560,7 +560,7 @@ TEST(http, async_check_writing) {
   closesocket(sock);
 
   WEB_STOP();
-  
+
   assert_buf.str[assert_buf.len] = 0;
   ASSERT_STREQ("0 == shttp_atomic_read32(&conn_outgoing(conn).is_writing)", assert_buf.str);
 }
@@ -609,7 +609,7 @@ static inline void async_not_thunked(void *act) {
 
 int on_message_complete_async_not_thunked(shttp_connection_t* conn) {
   uv_thread_t tid;
-  shttp_response_set_async(conn);  
+  shttp_response_set_async(conn);
   uv_thread_create(&tid, &async_not_thunked, conn);
   return 0;
 }
@@ -656,7 +656,7 @@ TEST(http, async_end_not_call_with_not_thunked) {
   //ASSERT_EQ(s, strlen(BODY_NOT_COMPLETE));
   //ASSERT_EQ(0, strcmp(buf, BODY_NOT_COMPLETE));
   closesocket(sock);
-  
+
   WEB_STOP();
 
   log_buf.str[log_buf.len] = 0;

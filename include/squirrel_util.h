@@ -190,9 +190,9 @@ extern shttp_assert_cb_t  shttp_assert_cb;
 
 #define shttp_assert_for_cb(x) do{ if(nil == shttp_assert_cb) { assert(x); } else { if(!(x)) { shttp_assert_cb(shttp_assert_ctx, #x, __FILE__, __LINE__); } } } while(0)
 #ifdef DEBUG
- #define shttp_assert(x) shttp_assert_for_cb(x)
+#define shttp_assert(x) shttp_assert_for_cb(x)
 #else
- #define shttp_assert(x)
+#define shttp_assert(x)
 #endif
 
 extern int shttp_win32_version;

@@ -75,9 +75,9 @@ static inline void _shttp_connection_assert_external(shttp_t* http, shttp_connec
   _shttp_connection_shttp_assert(http, conn);
 
   shttp_assert(((char*)conn_outgoing(conn).headers.array) == (((char*)conn) +
-         shttp_mem_align(sizeof(shttp_connection_internal_t)) +
-         http->settings.user_ctx_size +
-         (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
+               shttp_mem_align(sizeof(shttp_connection_internal_t)) +
+               http->settings.user_ctx_size +
+               (sizeof(shttp_kv_t) * http->settings.max_headers_count)));
   shttp_assert(conn_outgoing(conn).headers.capacity == http->settings.max_headers_count);
 
   shttp_assert(shttp_head_write_buffers_size == conn_outgoing(conn).head_write_buffers.capacity);
@@ -143,7 +143,7 @@ static inline int _shttp_connection_parse_request_first(shttp_connection_interna
 void _shttp_connection_restart_read_request(shttp_connection_internal_t* conn) {
   int               rc;
 
-  
+
   _shttp_response_on_completed(conn, 0);
 
   http_parser_pause(&conn->parser, 0);
@@ -152,13 +152,13 @@ void _shttp_connection_restart_read_request(shttp_connection_internal_t* conn) {
     spool_free(&conn->pool, conn->incomming.headers_block);
   }
   conn->incomming.headers_block = nil;
-  
+
   conn_incomming(conn).status = shttp_request_none;
   if(conn->rd_buf.end != conn->rd_buf.start) {
     conn->status = shttp_connection_request_parsing;
     rc = _shttp_connection_parse_request_first(conn,
-                                          conn->rd_buf.s + conn->rd_buf.start,
-                                          conn->rd_buf.end - conn->rd_buf.start, 0);
+         conn->rd_buf.s + conn->rd_buf.start,
+         conn->rd_buf.end - conn->rd_buf.start, 0);
     switch(rc) {
     case HPE_OK:
       break;
@@ -169,8 +169,8 @@ void _shttp_connection_restart_read_request(shttp_connection_internal_t* conn) {
       if((HPE_UNKNOWN + 1000) == rc) {
         ERR("parse error: nread != parsed.");
       } else if(HPE_CB_header_field != rc &&
-        HPE_CB_header_value != rc&&
-        HPE_CB_url != rc){
+                HPE_CB_header_value != rc&&
+                HPE_CB_url != rc) {
         ERR("parse error:%s", http_errno_name((enum http_errno)rc));
       }
       uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
@@ -185,8 +185,8 @@ void _shttp_connection_restart_read_request(shttp_connection_internal_t* conn) {
 #endif
     conn->rd_buf.end = 0;
     conn->rd_buf.start = 0;
-  } 
-  
+  }
+
   conn->status = shttp_connection_request_reading;
   rc = uv_read_start((uv_stream_t*)&conn->uv_handle,
                      _shttp_connection_on_alloc,
@@ -271,30 +271,7 @@ int _shttp_connection_on_message_begin(shttp_connection_internal_t* conn) {
   sstring_init(conn_incomming(conn).url, nil, 0);
   //sstring_init(conn_incomming(conn).headers_buf, nil, 0);
 
-  conn_outgoing(conn).write_req.data = nil;
-  conn_outgoing(conn).head_write_buffers.length = 0;
-  conn_outgoing(conn).body_write_buffers.length = 0;
-  conn_outgoing(conn).call_after_completed.length = 0;
-  conn_outgoing(conn).call_after_data_writed.length = 0;
-  conn_outgoing(conn).failed_code = 0;
-  conn_outgoing(conn).is_body_end = 0;
-  
-  
-  if(0 != shttp_atomic_read32(&conn_outgoing(conn).is_async)) {
-    abort();
-  }
-  if(0 != shttp_atomic_read32(&conn_outgoing(conn).is_writing)) {
-    abort();
-  }
-  if(0 != shttp_atomic_read32(&conn_outgoing(conn).thread_id)) {
-    abort();
-  }
-  conn_outgoing(conn).reserved1 = 0;
-
-  conn_response(conn).headers.array = conn_outgoing(conn).headers.array;
-  conn_response(conn).status_code = SHTTP_STATUS_OK;
-  conn_response(conn).chunked = SHTTP_THUNKED_NONE;
-  conn_response(conn).close_connection = SHTTP_CLOSE_CONNECTION_NONE;
+  _shttp_response_init(conn->current_ctx);
   return 0;
 }
 
@@ -311,7 +288,7 @@ int _shttp_connection_on_headers_complete(shttp_connection_internal_t* conn) {
 
 int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
   int        res;
-  
+
   conn->status = shttp_connection_response_creating;
 
   if((6 == conn_request(conn).uri.path.len &&
@@ -330,13 +307,13 @@ int _shttp_connection_on_message_complete (shttp_connection_internal_t* conn) {
     conn->status = shttp_connection_closing;
     return 0;
   }
-  
+
   http_parser_pause(&conn->parser, 1);
 
   if(0 != shttp_atomic_read32(&conn_outgoing(conn).is_async)) {
     return 0;
   }
-  
+
   conn->status = shttp_connection_response_writing;
   _shttp_response_sync_send(conn);
   return 0;
@@ -366,8 +343,8 @@ static void _shttp_connection_on_alloc(uv_handle_t* req, size_t suggested_size, 
     return;
   }
 
-  p = spool_realloc(&conn->pool, conn->rd_buf.s, 
-    conn->rd_buf.capacity + 2 * 1024);
+  p = spool_realloc(&conn->pool, conn->rd_buf.s,
+                    conn->rd_buf.capacity + 2 * 1024);
   if(nil != p) {
     if(p != conn->rd_buf.s && shttp_headers_is_reading(conn)) {
       _relocate_buffer(conn, ((char*)p) - conn->rd_buf.s);
@@ -386,7 +363,7 @@ static void _shttp_connection_on_alloc(uv_handle_t* req, size_t suggested_size, 
 static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf) {
   shttp_connection_internal_t *conn;
   int                          rc;
-  
+
   conn = (shttp_connection_internal_t*)tcp->data;
   shttp_assert(conn->status == shttp_connection_request_reading);
 
@@ -398,7 +375,7 @@ static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_
     conn->status = shttp_connection_closing;
     return;
   }
-  
+
   conn->status = shttp_connection_request_parsing;
   if(shttp_request_none == conn_incomming(conn).status) {
     rc = _shttp_connection_parse_request_first(conn, buf->base, nread, nread);
@@ -424,8 +401,8 @@ static void _shttp_connection_on_read(uv_stream_t* tcp, ssize_t nread, const uv_
     if((HPE_UNKNOWN + 1000) == rc) {
       ERR("parse error: nread != parsed.");
     } else if(HPE_CB_header_field != rc &&
-      HPE_CB_header_value != rc&&
-      HPE_CB_url != rc){
+              HPE_CB_header_value != rc&&
+              HPE_CB_url != rc) {
       ERR("parse error:%s", http_errno_name((enum http_errno)rc));
     }
     uv_close((uv_handle_t*) &conn->uv_handle, &_shttp_connection_on_disconnect);
@@ -456,7 +433,7 @@ void _shttp_connection_on_connect(uv_stream_t* server_handle, int status) {
   }
 
   conn = TAILQ_LAST(&http->free_connections, shttp_connections_s);
-  
+
   conn->status = shttp_connection_none;
   // init pool and rd_buf
   spool_init(&conn->pool, (char*)conn->arena_base, conn->arena_capacity);

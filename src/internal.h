@@ -47,16 +47,16 @@ TAILQ_HEAD(shttp_listenings, shttp_listening_s);
 typedef struct shttp_listenings shttp_listenings_t;
 
 
-#define SHTTP_REQUEST_STATUS_DEF(XX)              \
-  XX(none,        0)                              \
-  XX(parse_begin,       1)                        \
-  XX(parse_status,      2)                        \
-  XX(parse_url,         3)                        \
-  XX(parse_field,       4)                        \
-  XX(parse_value,       5)                        \
-  XX(parse_headers_ok,  6)                        \
-  XX(parse_body,        7)                        \
-  XX(parse_end,         8)                        \
+#define SHTTP_REQUEST_STATUS_DEF(XX)                           \
+  XX(none,        0)                                           \
+  XX(parse_begin,       1)                                     \
+  XX(parse_status,      2)                                     \
+  XX(parse_url,         3)                                     \
+  XX(parse_field,       4)                                     \
+  XX(parse_value,       5)                                     \
+  XX(parse_headers_ok,  6)                                     \
+  XX(parse_body,        7)                                     \
+  XX(parse_end,         8)                                     \
   XX(failed,            254)
 
 typedef enum shttp_request_status_e {
@@ -67,13 +67,13 @@ typedef enum shttp_request_status_e {
 } shttp_request_status_t;
 
 
-#define SHTTP_CONNECTION_STATUS_DEF(XX)             \
-  XX(none,                 0)                       \
-  XX(request_reading,      1)                       \
-  XX(request_parsing,      2)                       \
-  XX(response_creating,    3)                       \
-  XX(response_writing,     4)                       \
-  XX(closing,              5)                       \
+#define SHTTP_CONNECTION_STATUS_DEF(XX)                        \
+  XX(none,                 0)                                  \
+  XX(request_reading,      1)                                  \
+  XX(request_parsing,      2)                                  \
+  XX(response_creating,    3)                                  \
+  XX(response_writing,     4)                                  \
+  XX(closing,              5)                                  \
   XX(failed,             254)
 
 typedef enum shttp_connection_status_e {
@@ -105,12 +105,6 @@ typedef struct shttp_buffer_s {
   size_t                                  capacity;
 } shttp_buffer_t;
 
-typedef struct shttp_kv_array_s {
-  size_t                                  capacity;
-  size_t                                  length;
-  shttp_kv_t                            * array;
-} shttp_kv_array_t;
-
 typedef struct shttp_kv_buffer_s {
   size_t                                   capacity;
   shttp_kv_t                             * array;
@@ -122,17 +116,24 @@ typedef struct shttp_buffers_s {
   uv_buf_t                                 array[shttp_write_buffers_size];
 } shttp_buffers_t;
 
-typedef struct shttp_write_cb_buffer_s {
+typedef struct shttp_connection_cb_buffer_s {
   size_t                                   capacity;
   size_t                                   length;
-  shttp_write_cb_t                         array[shttp_write_cb_buffers_size];
-} shttp_write_cb_buffer_t;
+  shttp_connection_cb_t                    array[shttp_write_cb_buffers_size];
+} shttp_connection_cb_buffer_t;
+
+typedef struct shttp_context_cb_buffer_s {
+  size_t                                   capacity;
+  size_t                                   length;
+  shttp_context_cb_t                       array[shttp_write_cb_buffers_size];
+} shttp_context_cb_buffer_t;
 
 typedef struct shttp_incomming_s {
   // should init while creating
-  shttp_kv_array_t                         headers;
+  shttp_kv_buffer_t                        headers;
 
   // should init while new request is arrived
+  shttp_request_t                          request;
   shttp_request_status_t                   status;
   void                                   * headers_block;
   sstring_t                                headers_buf;
@@ -144,29 +145,51 @@ typedef struct shttp_outgoing_s {
   shttp_kv_buffer_t                        headers;
   shttp_buffers_t                          head_write_buffers;
   shttp_buffers_t                          body_write_buffers;
-  shttp_write_cb_buffer_t                  call_after_completed;
-  shttp_write_cb_buffer_t                  call_after_data_writed;
+  shttp_context_cb_buffer_t                call_after_completed;
+  shttp_context_cb_buffer_t                call_after_data_writed;
 
   // should init while new request is arrived
+  shttp_response_t                         response;
   uv_write_t                               write_req;
   sstring_t                                content_type;
   sbuffer_t                                head_buffer;
   sbuffer_t                                body_buffer;
   shttp_res                                failed_code;
   uint32_t                                 is_body_end:1;
+  uint32_t                                 head_writed:1;
 #ifdef SHTTP_THREAD_SAFE
-  uint32_t                                 reserved1:31;
+  uint32_t                                 reserved1:30;
   atomic32_t                               is_async;
   atomic32_t                               is_writing;
   atomic32_t                               thread_id;
 #else
   uint32_t                                 is_async:1;
   uint32_t                                 is_writing:1;
-  uint32_t                                 reserved1:29;
+  uint32_t                                 reserved1:28;
   uint32_t                                 thread_id;
 #endif
 } shttp_outgoing_t;
 
+
+typedef struct shttp_context_internal_s {
+  shttp_context_t                       external;
+  shttp_incomming_t                     incomming;
+  shttp_outgoing_t                      outgoing;
+
+  void*                                 arena_base;
+  size_t                                arena_capacity;
+  spool_t                               pool;
+
+  TAILQ_ENTRY(shttp_context_internal_s) next;
+} shttp_context_internal_t;
+
+#define ctx_request(it) (it)->incomming.request
+#define ctx_response(it) (it)->outgoing.response
+#define ctx_incomming(it) (it)->incomming
+#define ctx_outgoing(it) (it)->outgoing
+
+TAILQ_HEAD(shttp_contexts_s, shttp_context_internal_s);
+typedef struct shttp_contexts_s shttp_contexts_t;
 
 #ifdef SHTTP_THREAD_SAFE
 #define shttp_atomic_add32(mem, val)               atomic_add32(mem, val)
@@ -190,8 +213,6 @@ typedef struct shttp_connection_internal_s {
   // should init while creating
   shttp_connection_t                       external;
   shttp_callbacks_t                      * callbacks;
-  shttp_incomming_t                        incomming;
-  shttp_outgoing_t                         outgoing;
   spool_t                                  pool;
   void                                   * arena_base;
   size_t                                   arena_capacity;
@@ -203,17 +224,19 @@ typedef struct shttp_connection_internal_s {
   uv_tcp_t                                 uv_handle;
   struct http_parser                       parser;
   shttp_buffer_t                           rd_buf;
+  shttp_context_internal_t               * current_ctx;
+  int                                      context_id;
 
   TAILQ_ENTRY(shttp_connection_internal_s) next;
 } shttp_connection_internal_t;
 
 
 #define conn_external(it)  (it)->external
-#define conn_request(it)   (it)->external.request
-#define conn_response(it)  (it)->external.response
+#define conn_request(it)   (it)->current_ctx->incomming.request
+#define conn_response(it)  (it)->current_ctx->outgoing.response
 
-#define conn_incomming(it) (it)->incomming
-#define conn_outgoing(it)  (it)->outgoing
+#define conn_incomming(it) (it)->current_ctx->incomming
+#define conn_outgoing(it)  (it)->current_ctx->outgoing
 
 
 
@@ -228,11 +251,17 @@ struct shttp_s {
   shttp_connections_t                     connections;
   shttp_connections_t                     free_connections;
 
+  shttp_contexts_t                        free_contexts;
+
   shttp_listenings_t                      listenings;
   shttp_settings_t                        settings;
 
   void                                  * context;
 };
+
+
+#define container_of(ptr, type, member) \
+  ((type *) ((char *) (ptr) - offsetof(type, member)))
 
 #define SHTTP_STATUS_OK                         200
 
@@ -257,25 +286,25 @@ int  _shttp_connection_on_body (shttp_connection_internal_t*, const char *at, si
 int  _shttp_connection_on_message_complete (shttp_connection_internal_t*);
 
 
-#define call_for(conn, action)                                                  \
-  size_t                     i;                                                 \
-  shttp_write_cb_buffer_t cb_buf;                                               \
-                                                                                \
-  memcpy(&cb_buf.array[0],  &conn_outgoing(conn).call_after_##action.array[0],  \
-    sizeof(shttp_write_cb_t)*conn_outgoing(conn).call_after_##action.length);   \
-  cb_buf.length = conn_outgoing(conn).call_after_##action.length;               \
-  conn_outgoing(conn).call_after_##action.length = 0;                           \
-                                                                                \
-  for(i = 0; i < cb_buf.length; i ++) {                                         \
-    cb_buf.array[i].cb(&conn_external(conn), cb_buf.array[i].data);             \
+#define call_for(ctx, action)                                                         \
+  size_t                     i;                                                       \
+  shttp_context_cb_buffer_t  cb_buf;                                                  \
+                                                                                      \
+  memcpy(&cb_buf.array[0],  &ctx_outgoing(ctx).call_after_##action.array[0],          \
+    sizeof(shttp_context_cb_t)*ctx_outgoing(ctx).call_after_##action.length);         \
+  cb_buf.length = ctx_outgoing(ctx).call_after_##action.length;                       \
+  ctx_outgoing(ctx).call_after_##action.length = 0;                                   \
+                                                                                      \
+  for(i = 0; i < cb_buf.length; i ++) {                                               \
+    cb_buf.array[i].cb(&ctx->external, cb_buf.array[i].data);                         \
   }
 
-static inline void _shttp_response_call_hooks_after_completed(shttp_connection_internal_t *conn) {
-  call_for(conn, completed);
+static inline void _shttp_response_call_hooks_after_completed(shttp_context_internal_t *ctx) {
+  call_for(ctx, completed);
 }
 
-static inline void _shttp_response_call_hooks_after_writed(shttp_connection_internal_t *conn) {
-  call_for(conn, data_writed);
+static inline void _shttp_response_call_hooks_after_writed(shttp_context_internal_t *ctx) {
+  call_for(ctx, data_writed);
 }
 
 
@@ -291,7 +320,9 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
 void _shttp_response_on_completed(shttp_connection_internal_t *conn, int status);
 
 #ifdef DEBUG
-static inline void _shttp_response_assert_after_response_end(shttp_connection_internal_t *conn) {
+static inline void _shttp_response_assert_after_response_end(shttp_connection_t *external) {
+  shttp_connection_internal_t    *conn;
+  conn = (shttp_connection_internal_t*) external->internal;
   shttp_assert(0 == conn_outgoing(conn).head_write_buffers.length);
   shttp_assert(0 == conn_outgoing(conn).body_write_buffers.length);
   shttp_assert(0 == conn_outgoing(conn).call_after_data_writed.length);
@@ -326,7 +357,7 @@ static inline void _shttp_response_assert_after_response_end(shttp_connection_in
 const char * _shttp_connection_status_text(shttp_connection_status_t status);
 const char * _shttp_request_status_text(shttp_request_status_t status);
 void _shttp_status_init();
-int stats_handler(shttp_connection_t* external);
+int stats_handler(shttp_context_t* external);
 
 #ifdef __cplusplus
 }

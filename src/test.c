@@ -83,7 +83,7 @@ DLL_VARIABLE int RUN_TEST_BY_CATALOG(const char* nm, out_fn_t out) {
     }
     next = next->_next;
   }
-  
+
   output(out, "===============    end    ===============\r\n");
   return 0;
 }
@@ -93,7 +93,7 @@ DLL_VARIABLE int RUN_ALL_TESTS(out_fn_t out) {
   char               skipped_fmt[512];
   TestCase         * next;
   int                is_skipped;
-  
+
   snprintf(skipped_fmt, 512, "[%%%us] SKIPPED\r\n", name_max_len);
   snprintf(ok_fmt, 512, "[%%%us] OK\r\n", name_max_len);
 

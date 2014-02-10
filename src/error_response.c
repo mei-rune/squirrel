@@ -72,8 +72,8 @@ void _shttp_response_send_error_message_format(shttp_connection_internal_t *conn
   res = vsnprintf(buf, buf_len, fmt, args);
   if(-1 == res) {
     ERR("write: format message failed, %s", strerror(errno));
-    uv_close((uv_handle_t*) &conn->uv_handle, 
-      &_shttp_connection_on_disconnect);
+    uv_close((uv_handle_t*) &conn->uv_handle,
+             &_shttp_connection_on_disconnect);
     sl_free(buf);
     va_end(args);
     return;

@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-  
+
 void              *shttp_assert_ctx = nil;
 shttp_assert_cb_t  shttp_assert_cb = nil;
 

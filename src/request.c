@@ -189,7 +189,7 @@ static int _http_request_on_body(http_parser *inner, const char *at, size_t leng
 
   conn = (shttp_connection_internal_t*)inner->data;
   shttp_assert(shttp_request_parse_body == conn_incomming(conn).status ||
-         shttp_request_parse_headers_ok == conn_incomming(conn).status);
+               shttp_request_parse_headers_ok == conn_incomming(conn).status);
   conn_incomming(conn).status = shttp_request_parse_body;
   return _shttp_connection_on_body(conn, at, length);
 }
@@ -199,7 +199,7 @@ static int _http_request_on_message_complete(http_parser* inner) {
 
   conn = (shttp_connection_internal_t*)inner->data;
   shttp_assert(shttp_request_parse_body == conn_incomming(conn).status ||
-         shttp_request_parse_headers_ok == conn_incomming(conn).status);
+               shttp_request_parse_headers_ok == conn_incomming(conn).status);
   conn_incomming(conn).status = shttp_request_parse_end;
   return _shttp_connection_on_message_complete(conn);
 }

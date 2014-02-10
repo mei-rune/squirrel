@@ -42,3 +42,4 @@ tools/gyp
 # format code artifacts
 format_code.bat
 *.orig
+*.i
